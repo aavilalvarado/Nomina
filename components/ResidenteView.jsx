@@ -233,6 +233,7 @@ export default function ResidenteView({ perfil }) {
                   <th key={d} className="text-center px-2 py-3 font-medium text-gray-500 text-xs">{d}</th>
                 ))}
                 <th className="text-center px-2 py-3 font-medium text-gray-500 text-xs">Días</th>
+                <th className="text-center px-2 py-3 font-medium text-gray-500 text-xs">H.Extra</th>
               </tr>
             </thead>
             <tbody>
@@ -280,6 +281,12 @@ export default function ResidenteView({ perfil }) {
                       <span className={`text-xs font-medium ${sinObra ? 'text-gray-300' : tieneFalta ? 'text-red-500' : 'text-gray-700'}`}>
                         {sinObra ? '—' : dias.toFixed(1)}
                       </span>
+                    </td>
+                    <td className="px-1 py-2 text-center">
+                      <input type="number" min="0" step="0.5" value={a.horas_extra || 0}
+                        onChange={e => updateAsistencia(t.id, 'horas_extra', e.target.value)}
+                        disabled={bloqueado || sinObra}
+                        className="text-xs border border-gray-200 rounded px-1 py-0.5 w-12 text-center disabled:bg-gray-50 disabled:text-gray-300" />
                     </td>
                   </tr>
                 )
