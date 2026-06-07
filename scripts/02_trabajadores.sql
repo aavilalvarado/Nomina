@@ -1,0 +1,81 @@
+-- ============================================================
+-- TRABAJADORES — Datos del Excel NOMINA_21-2026
+-- Ejecutar DESPUÉS de 01_schema.sql
+-- ============================================================
+
+-- Insertar trabajadores con referencia a obra por nombre
+-- SILVANA
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '004','RAMIREZ FLORES LEONEL','OFICIAL',id,'TRANSFERENCIA',5550,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '006','MUÑIZ RIOS JUAN CARLOS','AYUDANTE',id,'TRANSFERENCIA',3900,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '007','RAMIREZ MARTINEZ ALAN DANIEL','AYUDANTE',id,'TRANSFERENCIA',4000,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '010','BENITEZ CARRILLO BUENA VENTURA','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '011','RAMIREZ CALDERON RAUL','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '013','LOPEZ PEREZ HUMBERTO','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '017','SARMIENTO COTA TIODOSO','OFICIAL ALBAÑIL',id,'TRANSFERENCIA',4500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '023','GRANADOS MARIN LUIS ENRIQUE','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '027','LOEZA CABRERA EMANUEL OSIEL','AUX OBRA',id,'TRANSFERENCIA',5000,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '031','MENDOZA ALFONSO CARLOS ENRIQUE','OFICIAL',id,'TRANSFERENCIA',4000,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '033','ANTONIO VAZQUEZ FERNANDO','OFICIAL ALBAÑIL',id,'TRANSFERENCIA',6000,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '034','ANTONIO VICTORIA JOSE FERNANDO','OFICIAL ALBAÑIL',id,'TRANSFERENCIA',6000,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '036','DIAZ GARCIA JOEL ESAU','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '038','VICARIO MANRIQUEZ JUAN MANUEL','OFICIAL ALBAÑIL',id,'TRANSFERENCIA',4500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '043','HERNANDEZ CRUZ MIGUEL ANGEL','OFICIAL FIERRERO',id,'TRANSFERENCIA',5500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '044','MOSQUEDA CHAVEZ JUAN DIEGO','OFICIAL FIERRERO',id,'TRANSFERENCIA',4500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '045','NAJERA RAMIREZ ARTURO','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '046','DE LA CRUZ PAREDES ROSOLINO','OFICIAL ALBAÑIL',id,'TRANSFERENCIA',6000,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '047','SANDOVAL DIAZ LUIS ARMANDO','OFICIAL FIERRERO',id,'TRANSFERENCIA',4500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '049','BAUTISTA MARTINEZ DANIEL','OFICIAL ALBAÑIL',id,'TRANSFERENCIA',4500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '050','MARIÑO ROCHA OSCAR','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '051','JAVALERA MEDINA ADAN FERNANDO','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '053','CABRERA BECERRA GONZALO','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '055','FARRERA ALVARADO LUIS ENRIQUE','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '056','MEDINA VALENCIA JOSE LUIS','OFICIAL ALBAÑIL',id,'TRANSFERENCIA',4500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '057','GUERRERO ORTEGA SANTOS','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '061','HERRERA HERNANDEZ MAURICIO MAGDALENO','OFICIAL ALBAÑIL',id,'TRANSFERENCIA',4500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '062','RAMIREZ VAZQUEZ JULIO','OFICIAL ALBAÑIL',id,'TRANSFERENCIA',6000,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '064','DIAZ GARCIA JOSUE JACOB','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '065','VELAZQUEZ JAVALERA JUAN ANTONIO','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '067','CRUZ ROMERO VIDAL','OFICIAL FIERRERO / CARPINTERO',id,'TRANSFERENCIA',5000,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '068','RAMIREZ CRUZ JUAN CARLOS','OFICIAL FIERRERO / CARPINTERO',id,'TRANSFERENCIA',5000,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '070','RAMIREZ MORENO ABEL','OFICIAL FIERRERO / CARPINTERO',id,'TRANSFERENCIA',5000,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '071','RAMIREZ VAZQUEZ ENRIQUE','OFICIAL ALBAÑIL',id,'TRANSFERENCIA',6000,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '087','VAZQUEZ HERNANDEZ ISMAEL EDUARDO','TABLAROQUERO',id,'TRANSFERENCIA',4500,true from obras where nombre='SILVANA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '088','LEMUN GARCIA ANASTACIO','TABLAROQUERO',id,'TRANSFERENCIA',4500,true from obras where nombre='SILVANA';
+
+-- LUCIA
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '003','PEREZ AYALA PAULINA','AUX OBRA',id,'TRANSFERENCIA',5000,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '005','ARCOS CONTRERAS SAUL','OFICIAL ELECTRICO',id,'TRANSFERENCIA',5000,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '024','RAMIREZ MORENO MARCO ANTONIO','OFICIAL ALBAÑIL',id,'TRANSFERENCIA',7500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '026','RAMIREZ CUEVAS MARCO ANTONIO','OFICIAL FIERRERO / CARPINTERO',id,'TRANSFERENCIA',5500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '041','BENITO MORALES RODRIGO','OFICIAL FIERRERO',id,'TRANSFERENCIA',4500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '042','BENITO MORALES OSCAR','OFICIAL FIERRERO',id,'TRANSFERENCIA',4500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '063','PARDO ARCOS URIEL ALEXEI','AYUDANTE ELECTRICO',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '066','MARTINEZ GONZALEZ PAULO','OFICIAL FIERRERO / CARPINTERO',id,'TRANSFERENCIA',5000,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '069','ZEDEJAS HERNANDEZ CARLOS DANIEL','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '072','CALVO ROBLEDO ALFREDO','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',4500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '073','BARRERA LAES FRANCISCO','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '075','MEDELLIN GARBALENA JUAN PABLO','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '077','CALIXTO BELLO JOSE ANTONIO','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '078','CERDA ZAVALA REYNALDO','AYUDANTE ALBAÑIL',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '080','DE JESUS MARTINEZ JULIO CESAR','OFICIAL FIERRERO / CARPINTERO',id,'TRANSFERENCIA',5500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '081','BENITO MORALES PROGUDENCIO','OFICIAL FIERRERO / CARPINTERO',id,'TRANSFERENCIA',4500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '082','CARAVANTES MARTINEZ YDAI','AYUDANTE / FIERRERO',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '083','CERDA HUERTA REYNALDO','AYUDANTE / FIERRERO',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '084','JIMENEZ SAIZ LUIS ENRIQUE','OFICIAL BLOQUERO',id,'TRANSFERENCIA',4500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '085','VELAZQUEZ PITONES JOSE MANUEL','OFICIAL BLOQUERO',id,'TRANSFERENCIA',4500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '086','BECERRA ARAGON J GUADALUPE','OFICIAL BLOQUERO',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '089','TOLEDO DE LA CRUZ MARCO ANTONIO','AYUDANTE',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '090','RAMIREZ MEDINA LUIS FELIPE','AYUDANTE',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '091','MARTINEZ TORRES JOSE ANGEL','OFICIAL BLOQUERO',id,'TRANSFERENCIA',4500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '092','MARTINEZ TORRES JUAN','OFICIAL BLOQUERO',id,'TRANSFERENCIA',4500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '093','LANDIN MUÑIZ ALEJANDRO','AYUDANTE',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '094','AGUIRRE PEÑA ABEL','AYUDANTE',id,'TRANSFERENCIA',3500,true from obras where nombre='LUCIA';
+
+-- OFICINA
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '000','GARCIA ESCALANTE SALVADOR','D.O',id,'EFECTIVO',16225,false from obras where nombre='OFICINA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '001','GRIJALVA GUERRERO EDUARDO ALFONSO','D.O',id,'TRANSFERENCIA',1881.2,false from obras where nombre='OFICINA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '002','GONZALEZ SANCHEZ STEPHANIE KATHE','ADMIN',id,'TRANSFERENCIA',8000,false from obras where nombre='OFICINA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '009','GARIBAY RODRIGUEZ AMERICA ISABEL','AUX PROY',id,'TRANSFERENCIA',3550,false from obras where nombre='OFICINA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '028','ROJAS ESPINOZA JUAN ESTEBAN','AUX PROY',id,'TRANSFERENCIA',3283,false from obras where nombre='OFICINA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '054','TREJO GARCIA GILDARDO ADRIAN','AUX ADMIN',id,'TRANSFERENCIA',4500,false from obras where nombre='OFICINA';
+insert into trabajadores (num_empleado, nombre, puesto, obra_id, forma_pago, sueldo_semanal, tiene_bono) select '079','SANCHEZ LOPEZ JUAN ANTONIO','ASISTENTE ADMON',id,'TRANSFERENCIA',3500,false from obras where nombre='OFICINA';
