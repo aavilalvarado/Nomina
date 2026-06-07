@@ -12,32 +12,27 @@ function calcularDias(asistencia) {
 }
 
 export default function ResidenteView({ perfil }) {
-  const [obrasResidente, setObrasResidente] = useState([]) // obras que puede asignar
+  const [obrasResidente, setObrasResidente] = useState([])
   const [semana, setSemana] = useState(null)
   const [trabajadores, setTrabajadores] = useState([])
   const [asistencias, setAsistencias] = useState({})
-  const [obraSeleccionada, setObraSeleccionada] = useState({}) // obraId por trabajador
+  const [obraSeleccionada, setObraSeleccionada] = useState({})
   const [nominasPorObra, setNominasPorObra] = useState({})
   const [guardando, setGuardando] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [msg, setMsg] = useState('')
-  const [filtro, setFiltro] = useState('todos') // 'todos' | 'asignados' | 'sin-asignar'
+  const [filtro, setFiltro] = useState('todos')
 
   useEffect(() => { cargarDatos() }, [])
 
   async function cargarDatos() {
-    // Obras asignadas al residente — filtrar estrictamente por usuario
     const { data: asignaciones } = await supabase
       .from('asignaciones')
       .select('obra_id, obra:obras(id, nombre)')
       .eq('usuario_id', perfil.id)
-    const obras = (asignaciones || [])
-      .filter(a => a.obra && a.obra.id)
-      .map(a => ({ id: a.obra.id, nombre: a.obra.nombre }))
+    const obras = (asignaciones || []).filter(a => a.obra?.id).map(a => ({ id: a.obra.id, nombre: a.obra.nombre }))
     setObrasResidente(obras)
-    console.log('Obras del residente:', obras)
 
-    // Semana abierta
     const { data: semanas } = await supabase
       .from('semanas').select('*').eq('estado', 'abierta')
       .order('fecha_inicio', { ascending: false }).limit(1)
@@ -45,67 +40,54 @@ export default function ResidenteView({ perfil }) {
     const sem = semanas[0]
     setSemana(sem)
 
-    // Todos los trabajadores excepto OFICINA
     const { data: todasObras } = await supabase.from('obras').select('id,nombre')
     const oficinaId = (todasObras || []).find(o => o.nombre === 'OFICINA')?.id
     let q = supabase.from('trabajadores')
       .select('id, num_empleado, nombre, puesto, tiene_bono, obra_id')
-      .eq('activo', true)
-      .order('num_empleado', { ascending: true })
+      .eq('activo', true).order('num_empleado', { ascending: true })
     if (oficinaId) q = q.neq('obra_id', oficinaId)
     const { data: trab } = await q
     setTrabajadores(trab || [])
 
-    // Nóminas de esta semana para las obras del residente
     const obraIds = obras.map(o => o.id)
     let nominasMap = {}
     if (obraIds.length > 0) {
       const { data: nominas } = await supabase
         .from('nominas_obra').select('*')
-        .eq('semana_id', sem.id)
-        .in('obra_id', obraIds)
+        .eq('semana_id', sem.id).in('obra_id', obraIds)
       ;(nominas || []).forEach(n => { nominasMap[n.obra_id] = n })
     }
     setNominasPorObra(nominasMap)
 
-    // Cargar asistencias ya guardadas para saber qué obra tiene cada trabajador
     const obraSelecInit = {}
     const asistInit = {}
     for (const obraId of obraIds) {
       const nom = nominasMap[obraId]
       if (!nom) continue
       const { data: asist } = await supabase
-        .from('asistencias').select('*, trabajador_id')
-        .eq('nomina_obra_id', nom.id)
+        .from('asistencias').select('*').eq('nomina_obra_id', nom.id)
       ;(asist || []).forEach(a => {
         obraSelecInit[a.trabajador_id] = obraId
         asistInit[a.trabajador_id] = a
       })
     }
-
-    // Inicializar asistencia por defecto para todos
     ;(trab || []).forEach(t => {
-      if (!asistInit[t.id]) {
-        asistInit[t.id] = {
-          trabajador_id: t.id,
-          viernes: 1.1, sabado: 1.1, domingo: 0,
-          lunes: 1.1, martes: 1.1, miercoles: 1.1, jueves: 1.1,
-          horas_extra: 0, prestamos: 0
-        }
+      if (!asistInit[t.id]) asistInit[t.id] = {
+        viernes: 1.1, sabado: 1.1, domingo: 0,
+        lunes: 1.1, martes: 1.1, miercoles: 1.1, jueves: 1.1,
+        horas_extra: 0, prestamos: 0
       }
       if (!obraSelecInit[t.id]) obraSelecInit[t.id] = ''
     })
-
     setAsistencias(asistInit)
     setObraSeleccionada(obraSelecInit)
   }
 
-  function updateAsistencia(trabajadorId, campo, valor) {
-    setAsistencias(prev => ({ ...prev, [trabajadorId]: { ...prev[trabajadorId], [campo]: valor } }))
+  function updateAsistencia(id, campo, valor) {
+    setAsistencias(prev => ({ ...prev, [id]: { ...prev[id], [campo]: valor } }))
   }
-
-  function updateObra(trabajadorId, obraId) {
-    setObraSeleccionada(prev => ({ ...prev, [trabajadorId]: obraId }))
+  function updateObra(id, obraId) {
+    setObraSeleccionada(prev => ({ ...prev, [id]: obraId }))
   }
 
   async function getNominaId(obraId) {
@@ -146,8 +128,8 @@ export default function ResidenteView({ perfil }) {
 
   async function enviar() {
     await guardar(); setEnviando(true)
-    for (const obraId of obrasResidente.map(o => o.id)) {
-      const nom = nominasPorObra[obraId]
+    for (const o of obrasResidente) {
+      const nom = nominasPorObra[o.id]
       if (nom && nom.estado === 'borrador') {
         await supabase.from('nominas_obra')
           .update({ estado: 'enviada', enviada_at: new Date().toISOString() })
@@ -157,7 +139,6 @@ export default function ResidenteView({ perfil }) {
     await cargarDatos(); setEnviando(false)
   }
 
-  // Filtrar trabajadores según selección
   const trabajadoresFiltrados = trabajadores.filter(t => {
     const obraId = obraSeleccionada[t.id]
     if (filtro === 'asignados') return !!obraId
@@ -178,35 +159,31 @@ export default function ResidenteView({ perfil }) {
   return (
     <div>
       {/* Header */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4 flex items-center justify-between flex-wrap gap-3">
+      <div className="bg-white rounded-2xl border border-gray-100 p-3 mb-3 flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h2 className="font-semibold text-gray-900">
-            Captura — {obrasResidente.map(o => o.nombre).join(' · ')}
-          </h2>
-          <p className="text-sm text-gray-500">Semana {semana.semana_num} · {semana.fecha_inicio} al {semana.fecha_fin}</p>
+          <h2 className="font-semibold text-gray-900 text-sm">Captura — {obrasResidente.map(o => o.nombre).join(' · ')}</h2>
+          <p className="text-xs text-gray-400">Semana {semana.semana_num} · {semana.fecha_inicio} al {semana.fecha_fin}</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {msg && <span className="text-green-600 text-sm font-medium">{msg}</span>}
+        <div className="flex items-center gap-2">
+          {msg && <span className="text-green-600 text-xs font-medium">{msg}</span>}
           {!todasBloqueadas && <>
             <button onClick={guardar} disabled={guardando}
-              className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">
               {guardando ? 'Guardando...' : '💾 Guardar'}
             </button>
             <button onClick={() => { if (confirm('¿Enviar nómina? Ya no podrás modificarla.')) enviar() }}
               disabled={enviando}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
               {enviando ? 'Enviando...' : 'Enviar nómina →'}
             </button>
           </>}
-          {todasBloqueadas && (
-            <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">✓ Enviada</span>
-          )}
+          {todasBloqueadas && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ Enviada</span>}
         </div>
       </div>
 
-      {/* Métricas y filtro */}
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <div className="flex gap-2">
+      {/* Filtros */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex gap-1">
           {[['todos','Todos'],['asignados','Asignados'],['sin-asignar','Sin asignar']].map(([val,lbl]) => (
             <button key={val} onClick={() => setFiltro(val)}
               className={`px-3 py-1 rounded-full text-xs border font-medium ${filtro === val ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'}`}>
@@ -214,26 +191,24 @@ export default function ResidenteView({ perfil }) {
             </button>
           ))}
         </div>
-        <span className="text-xs text-gray-500">
-          {totalAsignados} de {trabajadores.length} trabajadores asignados
-        </span>
+        <span className="text-xs text-gray-400">{totalAsignados} de {trabajadores.length} asignados</span>
       </div>
 
-      {/* Tabla */}
+      {/* Tabla con scroll horizontal */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto" style={{overflowX:'auto'}}>
+          <table style={{borderCollapse:'collapse', fontSize:'12px', whiteSpace:'nowrap'}}>
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs">#</th>
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs">Trabajador</th>
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs">Puesto</th>
-                <th className="text-left px-3 py-3 font-medium text-gray-500 text-xs">Obra</th>
+              <tr style={{borderBottom:'1px solid #f3f4f6', background:'#f9fafb'}}>
+                <th style={{textAlign:'left', padding:'8px 8px', color:'#9ca3af', fontWeight:500, position:'sticky', left:0, background:'#f9fafb', zIndex:1}}>#</th>
+                <th style={{textAlign:'left', padding:'8px 8px', color:'#9ca3af', fontWeight:500, minWidth:'180px'}}>Trabajador</th>
+                <th style={{textAlign:'left', padding:'8px 8px', color:'#9ca3af', fontWeight:500, minWidth:'130px'}}>Puesto</th>
+                <th style={{textAlign:'left', padding:'8px 8px', color:'#9ca3af', fontWeight:500, minWidth:'110px'}}>Obra</th>
                 {DIAS_LABEL.map(d => (
-                  <th key={d} className="text-center px-2 py-3 font-medium text-gray-500 text-xs">{d}</th>
+                  <th key={d} style={{textAlign:'center', padding:'8px 4px', color:'#9ca3af', fontWeight:500, width:'52px'}}>{d}</th>
                 ))}
-                <th className="text-center px-2 py-3 font-medium text-gray-500 text-xs">Días</th>
-                <th className="text-center px-2 py-3 font-medium text-gray-500 text-xs">H.Extra</th>
+                <th style={{textAlign:'center', padding:'8px 6px', color:'#9ca3af', fontWeight:500, width:'44px'}}>Días</th>
+                <th style={{textAlign:'center', padding:'8px 6px', color:'#9ca3af', fontWeight:500, width:'60px'}}>H.Extra</th>
               </tr>
             </thead>
             <tbody>
@@ -241,21 +216,24 @@ export default function ResidenteView({ perfil }) {
                 const a = asistencias[t.id] || {}
                 const dias = calcularDias(a)
                 const tieneFalta = dias < 6
-                const bonoAplica = t.tiene_bono && !tieneFalta
                 const obraId = obraSeleccionada[t.id]
                 const nom = nominasPorObra[obraId]
                 const bloqueado = nom && nom.estado !== 'borrador'
                 const sinObra = !obraId
 
                 return (
-                  <tr key={t.id} className={`border-b border-gray-50 hover:bg-gray-50 ${sinObra ? 'opacity-50' : tieneFalta ? 'bg-red-50/30' : ''}`}>
-                    <td className="px-3 py-2 text-gray-400 text-xs">{String(t.num_empleado).padStart(4,'0')}</td>
-                    <td className="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">{t.nombre}</td>
-                    <td className="px-3 py-2 text-gray-500 text-xs whitespace-nowrap">{t.puesto}</td>
-                    <td className="px-3 py-2">
+                  <tr key={t.id} style={{borderBottom:'1px solid #f9fafb', background: sinObra ? '#fafafa' : tieneFalta ? '#fff5f5' : 'white'}}>
+                    <td style={{padding:'6px 8px', color:'#d1d5db', position:'sticky', left:0, background: sinObra ? '#fafafa' : tieneFalta ? '#fff5f5' : 'white', zIndex:1}}>
+                      {String(t.num_empleado).padStart(4,'0')}
+                    </td>
+                    <td style={{padding:'6px 8px', fontWeight:500, color: sinObra ? '#9ca3af' : '#111827'}}>
+                      {t.nombre}
+                    </td>
+                    <td style={{padding:'6px 8px', color:'#6b7280'}}>{t.puesto}</td>
+                    <td style={{padding:'6px 8px'}}>
                       <select value={obraId || ''} onChange={e => updateObra(t.id, e.target.value)}
                         disabled={bloqueado}
-                        className={`text-xs border rounded px-1 py-1 w-32 ${bloqueado ? 'bg-gray-50 text-gray-400' : obraId ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
+                        style={{fontSize:'11px', border:'1px solid', borderColor: obraId ? '#93c5fd' : '#e5e7eb', borderRadius:'6px', padding:'2px 4px', width:'105px', background: obraId ? '#eff6ff' : 'white', color: obraId ? '#1d4ed8' : '#6b7280'}}>
                         <option value="">— Sin asignar —</option>
                         {obrasResidente.map(o => (
                           <option key={o.id} value={o.id}>{o.nombre}</option>
@@ -263,45 +241,39 @@ export default function ResidenteView({ perfil }) {
                       </select>
                     </td>
                     {DIAS.map(d => (
-                      <td key={d} className="px-1 py-2 text-center">
+                      <td key={d} style={{padding:'4px 2px', textAlign:'center'}}>
                         <select value={a[d] ?? 1.1}
                           onChange={e => updateAsistencia(t.id, d, parseFloat(e.target.value))}
                           disabled={bloqueado || sinObra}
-                          className={`text-xs border rounded px-1 py-0.5 w-12 text-center ${
-                            bloqueado || sinObra ? 'bg-gray-50 text-gray-300' :
-                            parseFloat(a[d]) === 0 ? 'border-red-300 bg-red-50 text-red-600' : 'border-gray-200'
-                          }`}>
+                          style={{fontSize:'11px', border:'1px solid', borderColor: parseFloat(a[d])===0 ? '#fca5a5' : '#e5e7eb', borderRadius:'4px', padding:'2px 1px', width:'46px', textAlign:'center', background: parseFloat(a[d])===0 ? '#fef2f2' : sinObra ? '#f9fafb' : 'white', color: parseFloat(a[d])===0 ? '#ef4444' : sinObra ? '#d1d5db' : '#374151'}}>
                           <option value={1.1}>✓</option>
                           <option value={0.5}>½</option>
                           <option value={0}>✗</option>
                         </select>
                       </td>
                     ))}
-                    <td className="px-2 py-2 text-center">
-                      <span className={`text-xs font-medium ${sinObra ? 'text-gray-300' : tieneFalta ? 'text-red-500' : 'text-gray-700'}`}>
-                        {sinObra ? '—' : dias.toFixed(1)}
-                      </span>
+                    <td style={{padding:'4px 6px', textAlign:'center', fontWeight:600, color: sinObra ? '#d1d5db' : tieneFalta ? '#ef4444' : '#374151'}}>
+                      {sinObra ? '—' : dias % 1 === 0 ? dias : dias.toFixed(1)}
                     </td>
-                    <td className="px-1 py-2 text-center">
-                      <input type="number" min="0" step="0.5" value={a.horas_extra || 0}
+                    <td style={{padding:'4px 4px', textAlign:'center'}}>
+                      <input type="number" min="0" max="20" step="0.5"
+                        value={a.horas_extra || ''}
+                        placeholder="0"
                         onChange={e => updateAsistencia(t.id, 'horas_extra', e.target.value)}
                         disabled={bloqueado || sinObra}
-                        className="text-xs border border-gray-200 rounded px-1 py-0.5 w-12 text-center disabled:bg-gray-50 disabled:text-gray-300" />
+                        style={{width:'50px', fontSize:'11px', border:'1px solid #e5e7eb', borderRadius:'4px', padding:'2px 4px', textAlign:'center', background: sinObra ? '#f9fafb' : 'white', color: sinObra ? '#d1d5db' : '#374151'}} />
                     </td>
                   </tr>
                 )
               })}
             </tbody>
             <tfoot>
-              <tr className="bg-gray-50 border-t border-gray-200">
-                <td colSpan={11} className="px-3 py-3 text-xs text-gray-400">
-                  {totalAsignados} trabajadores asignados · {trabajadores.filter(t => {
-                    const oId = obraSeleccionada[t.id]
-                    return oId && calcularDias(asistencias[t.id]||{}) < 6
-                  }).length} con falta · 💡 Falta = bono cancelado
+              <tr style={{borderTop:'2px solid #e5e7eb', background:'#f9fafb'}}>
+                <td colSpan={11} style={{padding:'8px', fontSize:'11px', color:'#9ca3af'}}>
+                  {totalAsignados} trabajadores asignados · {trabajadores.filter(t => obraSeleccionada[t.id] && calcularDias(asistencias[t.id]||{}) < 6).length} con falta
                 </td>
-                <td colSpan={2} className="px-3 py-3 text-right text-xs text-gray-500">
-                  H.Extra: {trabajadores.reduce((s,t) => s + (parseFloat((asistencias[t.id]||{}).horas_extra)||0), 0)}h
+                <td style={{padding:'8px', textAlign:'center', fontSize:'11px', fontWeight:600, color:'#374151'}}>
+                  {trabajadores.reduce((s,t) => s + (parseFloat((asistencias[t.id]||{}).horas_extra)||0), 0)}h
                 </td>
               </tr>
             </tfoot>
