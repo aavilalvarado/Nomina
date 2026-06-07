@@ -22,11 +22,13 @@ export default function ResidenteView({ perfil }) {
   const [enviando, setEnviando] = useState(false)
   const [msg, setMsg] = useState('')
   const [filtro, setFiltro] = useState('todos')
-  const [fechasIncidencia, setFechasIncidencia] = useState({}) // fecha por trabajador
+  const [fechasIncidencia, setFechasIncidencia] = useState({})
+  const [cargando, setCargando] = useState(true)
 
   useEffect(() => { cargarDatos() }, [])
 
   async function cargarDatos() {
+    setCargando(true)
     const { data: asignaciones } = await supabase
       .from('asignaciones')
       .select('obra_id, obra:obras(id, nombre)')
@@ -103,6 +105,7 @@ export default function ResidenteView({ perfil }) {
     })
     setAsistencias(asistInit)
     setObraSeleccionada(obraSelecInit)
+    setCargando(false)
   }
 
   function updateAsistencia(id, campo, valor) {
@@ -183,7 +186,16 @@ export default function ResidenteView({ perfil }) {
   })
 
   const totalAsignados = trabajadores.filter(t => !!obraSeleccionada[t.id]).length
-  const todasBloqueadas = obrasResidente.every(o => nominasPorObra[o.id]?.estado !== 'borrador')
+  const todasBloqueadas = !cargando && obrasResidente.length > 0 && obrasResidente.every(o => nominasPorObra[o.id]?.estado !== 'borrador' && nominasPorObra[o.id]?.estado !== undefined)
+
+  if (cargando) return (
+    <div className="flex items-center justify-center py-20 text-gray-400">
+      <div className="text-center">
+        <div className="text-3xl mb-3">⏳</div>
+        <p className="text-sm">Cargando nómina...</p>
+      </div>
+    </div>
+  )
 
   if (!semana) return (
     <div className="text-center py-20 text-gray-400">
