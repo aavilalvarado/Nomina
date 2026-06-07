@@ -186,7 +186,7 @@ export default function ResidenteView({ perfil }) {
   })
 
   const totalAsignados = trabajadores.filter(t => !!obraSeleccionada[t.id]).length
-  const todasBloqueadas = !cargando && obrasResidente.length > 0 && obrasResidente.every(o => nominasPorObra[o.id]?.estado !== 'borrador' && nominasPorObra[o.id]?.estado !== undefined)
+  const todasBloqueadas = !cargando && obrasResidente.length > 0 && obrasResidente.filter(o => o && o.id).every(o => nominasPorObra[o.id]?.estado !== 'borrador' && nominasPorObra[o.id]?.estado !== undefined)
 
   if (cargando) return (
     <div className="flex items-center justify-center py-20 text-gray-400">
@@ -227,7 +227,7 @@ export default function ResidenteView({ perfil }) {
       {/* Header */}
       <div className="bg-white rounded-2xl border border-gray-100 p-3 mb-3 flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h2 className="font-semibold text-gray-900 text-sm">Captura — {obrasResidente.map(o => o.nombre).join(' · ')}</h2>
+          <h2 className="font-semibold text-gray-900 text-sm">Captura — {obrasResidente.filter(o => o && o.nombre).map(o => o.nombre).join(' · ')}</h2>
           <p className="text-xs text-gray-400">Semana {semana.semana_num} · {semana.fecha_inicio} al {semana.fecha_fin}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -303,7 +303,7 @@ export default function ResidenteView({ perfil }) {
                         disabled={bloqueado}
                         style={{fontSize:'11px', border:'1px solid', borderColor: obraId ? '#93c5fd' : '#e5e7eb', borderRadius:'6px', padding:'2px 4px', width:'105px', background: obraId ? '#eff6ff' : 'white', color: obraId ? '#1d4ed8' : '#6b7280'}}>
                         <option value="">— Sin asignar —</option>
-                        {obrasResidente.map(o => (
+                        {obrasResidente.filter(o => o && o.id).map(o => (
                           <option key={o.id} value={o.id}>{o.nombre}</option>
                         ))}
                         <option value="VACACIONES">🏖 Vacaciones</option>
