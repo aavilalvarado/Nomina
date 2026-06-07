@@ -42,12 +42,32 @@ export default function ResidenteView({ perfil }) {
 
     const { data: todasObras } = await supabase.from('obras').select('id,nombre')
     const oficinaId = (todasObras || []).find(o => o.nombre === 'OFICINA')?.id
+
+    // Obtener trabajadores ya asignados por OTROS residentes esta semana
+    const { data: nominasOtros } = await supabase
+      .from('nominas_obra')
+      .select('id, obra_id')
+      .eq('semana_id', sem.id)
+      .not('obra_id', 'in', `(${obras.map(o => o.id).join(',')})`)
+
+    let trabajadoresYaAsignados = []
+    for (const nom of (nominasOtros || [])) {
+      const { data: asist } = await supabase
+        .from('asistencias')
+        .select('trabajador_id')
+        .eq('nomina_obra_id', nom.id)
+      trabajadoresYaAsignados = [...trabajadoresYaAsignados, ...(asist || []).map(a => a.trabajador_id)]
+    }
+
     let q = supabase.from('trabajadores')
       .select('id, num_empleado, nombre, puesto, tiene_bono, obra_id')
       .eq('activo', true).order('num_empleado', { ascending: true })
     if (oficinaId) q = q.neq('obra_id', oficinaId)
-    const { data: trab } = await q
-    setTrabajadores(trab || [])
+    const { data: todosT } = await q
+
+    // Filtrar los ya asignados por otros residentes
+    const trab = (todosT || []).filter(t => !trabajadoresYaAsignados.includes(t.id))
+    setTrabajadores(trab)
 
     const obraIds = obras.map(o => o.id)
     let nominasMap = {}
