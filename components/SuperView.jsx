@@ -38,7 +38,7 @@ export default function SuperView({ perfil }) {
     const { data: inact } = await supabase.from('obras').select('*').eq('activa', false)
     setObrasInactivas(inact || [])
 
-    // Trabajadores sin obra
+    // Trabajadores sin obra fija (obra_id null)
     const { data: sinObra } = await supabase.from('trabajadores')
       .select('*').is('obra_id', null).eq('activo', true)
     setTrabajadoresSinObra(sinObra || [])
@@ -58,6 +58,21 @@ export default function SuperView({ perfil }) {
       .select('*, obra:obras(nombre), residente:usuarios(nombre)')
       .eq('semana_id', semanaActual.id)
     setNominas((data || []).filter(n => n?.obra && n?.residente))
+
+    // Calcular trabajadores no asignados esta semana
+    const nominaIds = (data || []).map(n => n.id)
+    let asignadosIds = []
+    for (const nid of nominaIds) {
+      const { data: asist } = await supabase
+        .from('asistencias').select('trabajador_id').eq('nomina_obra_id', nid)
+      asignadosIds = [...asignadosIds, ...(asist||[]).map(a => a.trabajador_id)]
+    }
+    // Todos los trabajadores activos excepto oficina
+    const { data: oficina } = await supabase.from('obras').select('id').eq('nombre','OFICINA').single()
+    const { data: todosTrab } = await supabase.from('trabajadores')
+      .select('*').eq('activo', true).neq('obra_id', oficina?.id || '')
+    const noAsignados = (todosTrab || []).filter(t => !asignadosIds.includes(t.id))
+    setTrabajadoresSinObra(noAsignados)
   }
 
   async function cargarIncidencias() {
@@ -278,10 +293,26 @@ export default function SuperView({ perfil }) {
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="p-3 border-b border-gray-100 flex items-center justify-between">
             <span className="font-medium text-sm text-gray-900">Asistencia — OFICINA</span>
-            <button onClick={guardarOficina} disabled={guardandoOficina}
-              className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-              {guardandoOficina ? 'Guardando...' : '💾 Guardar'}
-            </button>
+            <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+              {nominaOficina?.estado === 'aprobada' && <span style={{fontSize:'12px',background:'#dcfce7',color:'#16a34a',padding:'3px 10px',borderRadius:'20px',fontWeight:500}}>✓ Aprobada</span>}
+              {nominaOficina?.estado !== 'aprobada' && (
+                <>
+                  <button onClick={guardarOficina} disabled={guardandoOficina}
+                    className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    {guardandoOficina ? 'Guardando...' : '💾 Guardar'}
+                  </button>
+                  <button onClick={async () => {
+                    await guardarOficina()
+                    await supabase.from('nominas_obra').update({estado:'aprobada', aprobada_at: new Date().toISOString()}).eq('id', nominaOficina.id)
+                    setNominaOficina(prev => ({...prev, estado:'aprobada'}))
+                    setMsg('✓ Oficina aprobada')
+                    setTimeout(()=>setMsg(''),3000)
+                  }} className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    ✓ Aprobar
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
@@ -462,6 +493,7 @@ export default function SuperView({ perfil }) {
               <thead>
                 <tr style={{background:'#f9fafb',borderBottom:'1px solid #f3f4f6'}}>
                   <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Obra</th>
+                  <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Fecha arranque</th>
                   <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Acción</th>
                 </tr>
               </thead>
@@ -469,15 +501,26 @@ export default function SuperView({ perfil }) {
                 {obrasInactivas.map(o => (
                   <tr key={o.id} style={{borderBottom:'1px solid #f9fafb'}}>
                     <td style={{padding:'8px 12px',fontWeight:500,color:'#6b7280'}}>{o.nombre}</td>
+                    <td style={{padding:'8px 12px',color:'#9ca3af',fontSize:'12px'}}>{o.fecha_arranque || '—'}</td>
                     <td style={{padding:'8px 12px'}}>
-                      <button onClick={async () => {
-                        await supabase.from('obras').update({activa:true}).eq('id',o.id)
-                        cargarTodo()
-                        setMsg('✓ Obra reactivada')
-                        setTimeout(()=>setMsg(''),3000)
-                      }} className="text-xs bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700">
-                        Reactivar
-                      </button>
+                      <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+                        <input type="date" 
+                          placeholder="Fecha arranque"
+                          onChange={async e => {
+                            await supabase.from('obras').update({fecha_arranque: e.target.value}).eq('id',o.id)
+                            cargarTodo()
+                          }}
+                          style={{fontSize:'11px',border:'1px solid #e5e7eb',borderRadius:'6px',padding:'3px 6px',color:'#374151'}}
+                        />
+                        <button onClick={async () => {
+                          await supabase.from('obras').update({activa:true}).eq('id',o.id)
+                          cargarTodo()
+                          setMsg('✓ Obra reactivada')
+                          setTimeout(()=>setMsg(''),3000)
+                        }} className="text-xs bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700">
+                          Activar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
