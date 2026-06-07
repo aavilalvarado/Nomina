@@ -125,6 +125,16 @@ export default function ResidenteView({ perfil }) {
     for (const t of trabajadores) {
       const obraId = obraSeleccionada[t.id]
       if (!obraId) continue
+      // Vacaciones y baja se registran como incidencias
+      if (obraId === 'VACACIONES' || obraId === 'BAJA') {
+        await supabase.from('incidencias').upsert({
+          trabajador_id: t.id,
+          semana_id: semana.id,
+          tipo: obraId.toLowerCase(),
+          reportado_por: perfil.id
+        }, { onConflict: 'trabajador_id,semana_id' })
+        continue
+      }
       const nom = nominasPorObra[obraId]
       if (nom && nom.estado !== 'borrador') continue
       const nominaId = await getNominaId(obraId)
@@ -257,10 +267,12 @@ export default function ResidenteView({ perfil }) {
                 const obraId = obraSeleccionada[t.id]
                 const nom = nominasPorObra[obraId]
                 const bloqueado = nom && nom.estado !== 'borrador'
-                const sinObra = !obraId
+                const sinObra = !obraId || obraId === 'VACACIONES' || obraId === 'BAJA'
+                const esVacaciones = obraId === 'VACACIONES'
+                const esBaja = obraId === 'BAJA'
 
                 return (
-                  <tr key={t.id} style={{borderBottom:'1px solid #f9fafb', background: sinObra ? '#fafafa' : tieneFalta ? '#fff5f5' : 'white'}}>
+                  <tr key={t.id} style={{borderBottom:'1px solid #f9fafb', background: esBaja ? '#fef2f2' : esVacaciones ? '#f0f9ff' : sinObra ? '#fafafa' : tieneFalta ? '#fff5f5' : 'white'}}>
                     <td style={{padding:'6px 8px', color:'#d1d5db', position:'sticky', left:0, background: sinObra ? '#fafafa' : tieneFalta ? '#fff5f5' : 'white', zIndex:1}}>
                       {String(t.num_empleado).padStart(4,'0')}
                     </td>
@@ -276,6 +288,8 @@ export default function ResidenteView({ perfil }) {
                         {obrasResidente.map(o => (
                           <option key={o.id} value={o.id}>{o.nombre}</option>
                         ))}
+                        <option value="VACACIONES">🏖 Vacaciones</option>
+                        <option value="BAJA">🚫 Dar de baja</option>
                       </select>
                     </td>
                     {DIAS.map(d => (
@@ -291,7 +305,7 @@ export default function ResidenteView({ perfil }) {
                       </td>
                     ))}
                     <td style={{padding:'4px 6px', textAlign:'center', fontWeight:600, color: sinObra ? '#d1d5db' : tieneFalta ? '#ef4444' : '#374151'}}>
-                      {sinObra ? '—' : dias % 1 === 0 ? dias : dias.toFixed(1)}
+                      {esVacaciones ? <span style={{fontSize:'10px',color:'#0369a1',background:'#e0f2fe',padding:'1px 6px',borderRadius:'10px'}}>Vac</span> : esBaja ? <span style={{fontSize:'10px',color:'#dc2626',background:'#fee2e2',padding:'1px 6px',borderRadius:'10px'}}>Baja</span> : sinObra ? '—' : dias % 1 === 0 ? dias : dias.toFixed(1)}
                     </td>
                     <td style={{padding:'4px 4px', textAlign:'center'}}>
                       <input type="number" min="0" max="20" step="0.5"
