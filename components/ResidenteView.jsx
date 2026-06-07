@@ -26,13 +26,16 @@ export default function ResidenteView({ perfil }) {
   useEffect(() => { cargarDatos() }, [])
 
   async function cargarDatos() {
-    // Obras asignadas al residente (las únicas que puede seleccionar)
+    // Obras asignadas al residente — filtrar estrictamente por usuario
     const { data: asignaciones } = await supabase
       .from('asignaciones')
-      .select('obra:obras(id, nombre)')
+      .select('obra_id, obra:obras(id, nombre)')
       .eq('usuario_id', perfil.id)
-    const obras = (asignaciones || []).map(a => a.obra)
+    const obras = (asignaciones || [])
+      .filter(a => a.obra && a.obra.id)
+      .map(a => ({ id: a.obra.id, nombre: a.obra.nombre }))
     setObrasResidente(obras)
+    console.log('Obras del residente:', obras)
 
     // Semana abierta
     const { data: semanas } = await supabase
