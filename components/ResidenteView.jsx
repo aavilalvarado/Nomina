@@ -25,13 +25,15 @@ export default function ResidenteView({ perfil }) {
   useEffect(() => { cargarDatos() }, [])
 
   async function cargarDatos() {
-    // Cargar obras
+    // Cargar obras — excluir OFICINA del menú
     const { data: obrasData } = await supabase
       .from('obras')
       .select('id, nombre')
       .eq('activa', true)
-      .order('num_empleado', { ascending: true })
-    setObras(obrasData || [])
+      .order('nombre')
+    const obrasSinOficina = (obrasData || []).filter(o => o.nombre !== 'OFICINA')
+    setObras(obrasSinOficina)
+    const oficinaId = (obrasData || []).find(o => o.nombre === 'OFICINA')?.id
 
     // Cargar semana abierta
     const { data: semanas } = await supabase
@@ -44,12 +46,14 @@ export default function ResidenteView({ perfil }) {
     const sem = semanas[0]
     setSemana(sem)
 
-    // Cargar TODOS los trabajadores
-    const { data: trab } = await supabase
+    // Cargar trabajadores — excluir personal de OFICINA
+    let trabQuery = supabase
       .from('trabajadores')
       .select('id, num_empleado, nombre, puesto, tiene_bono, obra_id')
       .eq('activo', true)
       .order('num_empleado', { ascending: true })
+    if (oficinaId) trabQuery = trabQuery.neq('obra_id', oficinaId)
+    const { data: trab } = await trabQuery
     setTrabajadores(trab || [])
 
     // Inicializar obra por defecto de cada trabajador
