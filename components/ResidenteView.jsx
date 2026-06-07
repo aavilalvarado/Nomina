@@ -30,7 +30,7 @@ export default function ResidenteView({ perfil }) {
       .from('obras')
       .select('id, nombre')
       .eq('activa', true)
-      .order('num_empleado')
+      .order('num_empleado', { ascending: true })
     setObras(obrasData || [])
 
     // Cargar semana abierta
@@ -49,7 +49,7 @@ export default function ResidenteView({ perfil }) {
       .from('trabajadores')
       .select('id, num_empleado, nombre, puesto, tiene_bono, obra_id')
       .eq('activo', true)
-      .order('num_empleado')
+      .order('num_empleado', { ascending: true })
     setTrabajadores(trab || [])
 
     // Inicializar obra por defecto de cada trabajador
@@ -236,7 +236,7 @@ export default function ResidenteView({ perfil }) {
 
                 return (
                   <tr key={t.id} className={`border-b border-gray-50 hover:bg-gray-50 ${tieneFalta ? 'bg-red-50/30' : ''}`}>
-                    <td className="px-3 py-2 text-gray-400 text-xs">{String(t.num_empleado).padStart(3,'0')}</td>
+                    <td className="px-3 py-2 text-gray-400 text-xs">{String(t.num_empleado).padStart(4,'0')}</td>
                     <td className="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">{t.nombre}</td>
                     <td className="px-3 py-2 text-gray-500 text-xs whitespace-nowrap">{t.puesto}</td>
                     <td className="px-3 py-2">
