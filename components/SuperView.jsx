@@ -116,7 +116,7 @@ export default function SuperView({ perfil }) {
   async function guardarOficina() {
     if (!nominaOficina) return
     setGuardandoOficina(true)
-    const rows = trabajadoresOficina.map(t => {
+    const rows = (trabajadoresOficina || []).filter(t => t && t.nombre).map(t => {
       const a = asistOficina[t.id] || {}
       const dias = DIAS.reduce((s,d) => s + (parseFloat(a[d])===1.1?1:parseFloat(a[d])||0), 0)
       return {
@@ -238,7 +238,7 @@ export default function SuperView({ perfil }) {
       {/* Selector de semanas */}
       {semanas.length > 1 && (
         <div className="flex gap-1 mb-4 overflow-x-auto pb-1">
-          {semanas.map(s => (
+          {semanas.filter(s => s && s.id).map(s => (
             <button key={s.id} onClick={() => setSemanaActual(s)}
               className={`whitespace-nowrap px-3 py-1 rounded-full text-xs border ${semanaActual?.id===s.id?'bg-blue-600 text-white border-blue-600':'bg-white text-gray-500 border-gray-200'}`}>
               Sem {s.semana_num}
@@ -262,7 +262,7 @@ export default function SuperView({ perfil }) {
       {tab === 'nominas' && (
         <div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
-            {nominas.map(n => (
+            {nominas.filter(n => n && n.obra && n.obra.nombre && n.residente && n.residente.nombre).map(n => (
               <div key={n.id} onClick={() => n.estado==='enviada' && verDetalle(n)}
                 className={`bg-white rounded-xl border p-4 transition-all ${n.estado==='enviada'?'cursor-pointer hover:shadow-md border-blue-200':n.estado==='aprobada'?'border-green-200':n.estado==='rechazada'?'border-red-200':'border-gray-100'}`}>
                 <div className="flex items-center justify-between mb-1">
@@ -328,7 +328,7 @@ export default function SuperView({ perfil }) {
                 </tr>
               </thead>
               <tbody>
-                {trabajadoresOficina.filter(t => t && t.nombre).map(t => {
+                {(trabajadoresOficina || []).filter(t => t && t.nombre && t.id).map(t => {
                   const a = asistOficina[t.id] || {}
                   const dias = DIAS.reduce((s,d) => s + (parseFloat(a[d])===1.1?1:parseFloat(a[d])||0), 0)
                   return (
