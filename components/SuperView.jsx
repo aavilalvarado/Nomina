@@ -105,7 +105,7 @@ export default function SuperView({ perfil }) {
           'No.': t.num_empleado,
           'Trabajador': t.nombre,
           'Puesto': t.puesto,
-          'Obra': nom.obra.nombre,
+          'Obra': nom.obra?.nombre,
           'Forma Pago': t.forma_pago,
           'Vie': a.viernes,
           'Sáb': a.sabado,
@@ -219,14 +219,14 @@ export default function SuperView({ perfil }) {
 
       {/* Estado de obras */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-        {nominas.map(n => (
+        {nominas.filter(n => n && n.obra && n.residente).map(n => (
           <div key={n.id} className={`bg-white rounded-xl border p-4 cursor-pointer hover:shadow-sm transition-all ${
             n.estado === 'aprobada' ? 'border-green-200' :
             n.estado === 'enviada' ? 'border-blue-200' :
             n.estado === 'rechazada' ? 'border-red-200' : 'border-gray-100'
           }`} onClick={() => n.estado === 'enviada' && verDetalle(n)}>
             <div className="flex items-center justify-between mb-2">
-              <span className="font-medium text-gray-900 text-sm">{n.obra.nombre}</span>
+              <span className="font-medium text-gray-900 text-sm">{n.obra?.nombre}</span>
               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                 n.estado === 'aprobada' ? 'bg-green-100 text-green-700' :
                 n.estado === 'enviada' ? 'bg-blue-100 text-blue-700' :
@@ -265,7 +265,7 @@ export default function SuperView({ perfil }) {
           <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-xl">
             <div className="flex items-center justify-between p-4 border-b border-gray-100">
               <div>
-                <h3 className="font-semibold text-gray-900">Revisando: {detalleNomina.obra.nombre}</h3>
+                <h3 className="font-semibold text-gray-900">Revisando: {detalleNomina.obra?.nombre}</h3>
                 <p className="text-xs text-gray-500">Residente: {detalleNomina.residente?.nombre}</p>
               </div>
               <button onClick={() => setDetalleNomina(null)} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
