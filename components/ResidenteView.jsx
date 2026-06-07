@@ -152,7 +152,25 @@ export default function ResidenteView({ perfil }) {
   if (!semana) return (
     <div className="text-center py-20 text-gray-400">
       <div className="text-4xl mb-3">📅</div>
-      <p>No hay semana abierta. El superintendente debe abrir la semana.</p>
+      <p>No hay semana de nómina abierta.<br/>Regresa el viernes cuando se abra la siguiente semana.</p>
+    </div>
+  )
+
+  // Si todas las nóminas están enviadas, mostrar pantalla de confirmación
+  if (todasBloqueadas && obrasResidente.length > 0) return (
+    <div className="flex items-center justify-center py-20">
+      <div className="text-center max-w-md">
+        <div className="text-6xl mb-4">✅</div>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Nómina enviada correctamente</h2>
+        <p className="text-gray-500 mb-4">
+          Enviaste la nómina de <strong>{obrasResidente.map(o => o.nombre).join(' y ')}</strong> para la semana {semana.semana_num}.
+        </p>
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700">
+          El superintendente revisará y aprobará tu nómina.<br/>
+          Regresa el <strong>viernes</strong> para capturar la siguiente semana.
+        </div>
+        <p className="text-xs text-gray-400 mt-4">Semana {semana.semana_num} · {semana.fecha_inicio} al {semana.fecha_fin}</p>
+      </div>
     </div>
   )
 
