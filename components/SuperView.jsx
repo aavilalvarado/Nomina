@@ -35,7 +35,7 @@ export default function SuperView({ perfil }) {
     if (data && data.length > 0) setSemanaActual(data[0])
 
     // Obras inactivas
-    const { data: inact } = await supabase.from('obras').select('*').eq('activa', false).order('nombre')
+    const { data: inact } = await supabase.from('obras').select('*').eq('activa', false).order('nombre', { ascending: true })
     setObrasInactivas(inact || [])
 
     // Trabajadores sin obra fija (obra_id null)
