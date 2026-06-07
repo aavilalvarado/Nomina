@@ -233,9 +233,6 @@ export default function ResidenteView({ perfil }) {
                   <th key={d} className="text-center px-2 py-3 font-medium text-gray-500 text-xs">{d}</th>
                 ))}
                 <th className="text-center px-2 py-3 font-medium text-gray-500 text-xs">Días</th>
-                <th className="text-center px-2 py-3 font-medium text-gray-500 text-xs">H.Extra</th>
-                <th className="text-center px-2 py-3 font-medium text-gray-500 text-xs">Préstamos</th>
-                <th className="text-center px-2 py-3 font-medium text-gray-500 text-xs">Bono</th>
               </tr>
             </thead>
             <tbody>
@@ -283,25 +280,6 @@ export default function ResidenteView({ perfil }) {
                       <span className={`text-xs font-medium ${sinObra ? 'text-gray-300' : tieneFalta ? 'text-red-500' : 'text-gray-700'}`}>
                         {sinObra ? '—' : dias.toFixed(1)}
                       </span>
-                    </td>
-                    <td className="px-1 py-2 text-center">
-                      <input type="number" min="0" step="0.5" value={a.horas_extra || 0}
-                        onChange={e => updateAsistencia(t.id, 'horas_extra', e.target.value)}
-                        disabled={bloqueado || sinObra}
-                        className="text-xs border border-gray-200 rounded px-1 py-0.5 w-12 text-center disabled:bg-gray-50 disabled:text-gray-300" />
-                    </td>
-                    <td className="px-1 py-2 text-center">
-                      <input type="number" min="0" step="100" value={a.prestamos || 0}
-                        onChange={e => updateAsistencia(t.id, 'prestamos', e.target.value)}
-                        disabled={bloqueado || sinObra}
-                        className="text-xs border border-gray-200 rounded px-1 py-0.5 w-16 text-center disabled:bg-gray-50 disabled:text-gray-300" />
-                    </td>
-                    <td className="px-2 py-2 text-center">
-                      {!sinObra && t.tiene_bono ? (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${bonoAplica ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-500'}`}>
-                          {bonoAplica ? '✓' : '✗'}
-                        </span>
-                      ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
                   </tr>
                 )
