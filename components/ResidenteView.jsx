@@ -22,6 +22,7 @@ export default function ResidenteView({ perfil }) {
   const [enviando, setEnviando] = useState(false)
   const [msg, setMsg] = useState('')
   const [filtro, setFiltro] = useState('todos')
+  const [fechasIncidencia, setFechasIncidencia] = useState({}) // fecha por trabajador
 
   useEffect(() => { cargarDatos() }, [])
 
@@ -110,6 +111,9 @@ export default function ResidenteView({ perfil }) {
   function updateObra(id, obraId) {
     setObraSeleccionada(prev => ({ ...prev, [id]: obraId }))
   }
+  function updateFecha(id, fecha) {
+    setFechasIncidencia(prev => ({ ...prev, [id]: fecha }))
+  }
 
   async function getNominaId(obraId) {
     if (nominasPorObra[obraId]) return nominasPorObra[obraId].id
@@ -132,7 +136,8 @@ export default function ResidenteView({ perfil }) {
           trabajador_id: t.id,
           semana_id: semana.id,
           tipo: obraId.toLowerCase(),
-          reportado_por: perfil.id
+          reportado_por: perfil.id,
+          fecha_inicio: fechasIncidencia[t.id] || null
         }, { onConflict: 'trabajador_id,semana_id' })
         continue
       }
@@ -292,6 +297,20 @@ export default function ResidenteView({ perfil }) {
                         <option value="VACACIONES">🏖 Vacaciones</option>
                         <option value="BAJA">🚫 Dar de baja</option>
                       </select>
+                      {(esVacaciones || esBaja) && (
+                        <div style={{marginTop:'3px'}}>
+                          <input type="date"
+                            value={fechasIncidencia[t.id] || ''}
+                            onChange={e => updateFecha(t.id, e.target.value)}
+                            disabled={bloqueado}
+                            placeholder={esVacaciones ? 'Inicio vacaciones' : 'Fecha de baja'}
+                            style={{fontSize:'10px', border:'1px solid #e5e7eb', borderRadius:'4px', padding:'2px 4px', width:'105px', color: esVacaciones ? '#0369a1' : '#dc2626'}}
+                          />
+                          <div style={{fontSize:'9px', color:'#9ca3af', marginTop:'1px'}}>
+                            {esVacaciones ? 'Inicio de vacaciones' : 'Fecha de baja'}
+                          </div>
+                        </div>
+                      )}
                     </td>
                     {DIAS.map(d => (
                       <td key={d} style={{padding:'4px 2px', textAlign:'center'}}>
