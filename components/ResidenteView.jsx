@@ -44,14 +44,15 @@ export default function ResidenteView({ perfil }) {
     const oficinaId = (todasObras || []).find(o => o.nombre === 'OFICINA')?.id
 
     // Obtener trabajadores ya asignados por OTROS residentes esta semana
-    const { data: nominasOtros } = await supabase
+    const { data: todasNominas } = await supabase
       .from('nominas_obra')
       .select('id, obra_id')
       .eq('semana_id', sem.id)
-      .not('obra_id', 'in', `(${obras.map(o => o.id).join(',')})`)
+
+    const nominasOtros = (todasNominas || []).filter(n => !obras.map(o => o.id).includes(n.obra_id))
 
     let trabajadoresYaAsignados = []
-    for (const nom of (nominasOtros || [])) {
+    for (const nom of nominasOtros) {
       const { data: asist } = await supabase
         .from('asistencias')
         .select('trabajador_id')
