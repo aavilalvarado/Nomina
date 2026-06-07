@@ -35,7 +35,7 @@ export default function SuperView({ perfil }) {
     if (data && data.length > 0) setSemanaActual(data[0])
 
     // Obras inactivas
-    const { data: inact } = await supabase.from('obras').select('*').eq('activa', false)
+    const { data: inact } = await supabase.from('obras').select('*').eq('activa', false).order('nombre')
     setObrasInactivas(inact || [])
 
     // Trabajadores sin obra fija (obra_id null)
@@ -493,6 +493,7 @@ export default function SuperView({ perfil }) {
               <thead>
                 <tr style={{background:'#f9fafb',borderBottom:'1px solid #f3f4f6'}}>
                   <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Obra</th>
+                  <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Residente</th>
                   <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Fecha arranque</th>
                   <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Acción</th>
                 </tr>
@@ -501,6 +502,17 @@ export default function SuperView({ perfil }) {
                 {obrasInactivas.filter(o => o && o.nombre).map(o => (
                   <tr key={o.id} style={{borderBottom:'1px solid #f9fafb'}}>
                     <td style={{padding:'8px 12px',fontWeight:500,color:'#6b7280'}}>{o.nombre}</td>
+                    <td style={{padding:'8px 12px'}}>
+                      <input 
+                        defaultValue={o.residente_responsable || ''}
+                        onBlur={async e => {
+                          await supabase.from('obras').update({residente_responsable: e.target.value}).eq('id',o.id)
+                          cargarTodo()
+                        }}
+                        placeholder="Nombre residente"
+                        style={{fontSize:'11px',border:'1px solid #e5e7eb',borderRadius:'6px',padding:'3px 6px',width:'130px',color:'#374151'}}
+                      />
+                    </td>
                     <td style={{padding:'8px 12px',color:'#9ca3af',fontSize:'12px'}}>{o.fecha_arranque || '—'}</td>
                     <td style={{padding:'8px 12px'}}>
                       <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
