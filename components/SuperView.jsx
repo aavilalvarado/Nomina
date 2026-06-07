@@ -328,7 +328,7 @@ export default function SuperView({ perfil }) {
                 </tr>
               </thead>
               <tbody>
-                {trabajadoresOficina.map(t => {
+                {trabajadoresOficina.filter(t => t && t.nombre).map(t => {
                   const a = asistOficina[t.id] || {}
                   const dias = DIAS.reduce((s,d) => s + (parseFloat(a[d])===1.1?1:parseFloat(a[d])||0), 0)
                   return (
@@ -386,7 +386,7 @@ export default function SuperView({ perfil }) {
                 </tr>
               </thead>
               <tbody>
-                {vacaciones.map(i => (
+                {vacaciones.filter(i => i && i.trabajador).map(i => (
                   <tr key={i.id} style={{borderBottom:'1px solid #f0f9ff'}}>
                     <td style={{padding:'8px 12px',color:'#9ca3af'}}>{String(i.trabajador?.num_empleado||'').padStart(4,'0')}</td>
                     <td style={{padding:'8px 12px',fontWeight:500}}>{i.trabajador?.nombre}</td>
@@ -422,7 +422,7 @@ export default function SuperView({ perfil }) {
                 </tr>
               </thead>
               <tbody>
-                {bajas.map(i => (
+                {bajas.filter(i => i && i.trabajador).map(i => (
                   <tr key={i.id} style={{borderBottom:'1px solid #fef2f2'}}>
                     <td style={{padding:'8px 12px',color:'#9ca3af'}}>{String(i.trabajador?.num_empleado||'').padStart(4,'0')}</td>
                     <td style={{padding:'8px 12px',fontWeight:500}}>{i.trabajador?.nombre}</td>
@@ -467,11 +467,11 @@ export default function SuperView({ perfil }) {
                 </tr>
               </thead>
               <tbody>
-                {trabajadoresSinObra.map(t => (
+                {trabajadoresSinObra.filter(t => t && t.nombre).map(t => (
                   <tr key={t.id} style={{borderBottom:'1px solid #f9fafb'}}>
-                    <td style={{padding:'8px 12px',color:'#9ca3af'}}>{String(t.num_empleado).padStart(4,'0')}</td>
+                    <td style={{padding:'8px 12px',color:'#9ca3af'}}>{String(t.num_empleado||'').padStart(4,'0')}</td>
                     <td style={{padding:'8px 12px',fontWeight:500}}>{t.nombre}</td>
-                    <td style={{padding:'8px 12px',color:'#6b7280'}}>{t.puesto}</td>
+                    <td style={{padding:'8px 12px',color:'#6b7280'}}>{t.puesto||'—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -498,7 +498,7 @@ export default function SuperView({ perfil }) {
                 </tr>
               </thead>
               <tbody>
-                {obrasInactivas.map(o => (
+                {obrasInactivas.filter(o => o && o.nombre).map(o => (
                   <tr key={o.id} style={{borderBottom:'1px solid #f9fafb'}}>
                     <td style={{padding:'8px 12px',fontWeight:500,color:'#6b7280'}}>{o.nombre}</td>
                     <td style={{padding:'8px 12px',color:'#9ca3af',fontSize:'12px'}}>{o.fecha_arranque || '—'}</td>
@@ -596,7 +596,7 @@ export default function SuperView({ perfil }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {asistencias.map(a => {
+                    {asistencias.filter(a => a && a.trabajador).map(a => {
                       const t = a.trabajador
                       const tieneFalta = a.dias_total < 6
                       const bono = t?.tiene_bono && !tieneFalta ? (t?.monto_bono||0) : 0
