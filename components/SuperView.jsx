@@ -36,7 +36,8 @@ export default function SuperView({ perfil }) {
 
     // Obras inactivas
     const { data: inact } = await supabase.from('obras').select('*').eq('activa', false).order('nombre', { ascending: true })
-    setObrasInactivas(inact || [])
+    console.log('obras inactivas:', inact)
+setObrasInactivas(inact || [])
 
     // Trabajadores sin obra fija (obra_id null)
     const { data: sinObra } = await supabase.from('trabajadores')
