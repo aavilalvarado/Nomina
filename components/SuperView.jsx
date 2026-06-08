@@ -2,6 +2,170 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import * as XLSX from 'xlsx'
 
+
+const DIAS = ['viernes','sabado','domingo','lunes','martes','miercoles','jueves']
+const DIAS_LABEL = ['Vie','Sáb','Dom','Lun','Mar','Mié','Jue']
+
+function calcularDias(a) {
+  return DIAS.reduce((sum, d) => {
+    const v = parseFloat(a[d])
+    return sum + (v === 1.1 ? 1 : isNaN(v) ? 0 : v)
+  }, 0)
+}
+
+function SinObraCaptura({ trabajadores, semana, perfil, supabase, onGuardado }) {
+  const [obras, setObras] = useState([])
+  const [obraSeleccionada, setObraSeleccionada] = useState({})
+  const [asistencias, setAsistencias] = useState({})
+  const [nominasPorObra, setNominasPorObra] = useState({})
+  const [guardando, setGuardando] = useState(false)
+  const [filtro, setFiltro] = useState('todos')
+
+  useEffect(() => {
+    supabase.from('obras').select('id,nombre').eq('activa',true).neq('nombre','OFICINA').order('nombre')
+      .then(({data}) => setObras(data||[]))
+    // Inicializar asistencias
+    const init = {}
+    ;(trabajadores||[]).forEach(t => {
+      init[t.id] = { viernes:1.1, sabado:1.1, domingo:0, lunes:1.1, martes:1.1, miercoles:1.1, jueves:1.1, horas_extra:0 }
+    })
+    setAsistencias(init)
+  }, [trabajadores])
+
+  async function getNominaId(obraId) {
+    if (nominasPorObra[obraId]) return nominasPorObra[obraId]
+    let { data: nom } = await supabase.from('nominas_obra').select('id,estado')
+      .eq('semana_id', semana.id).eq('obra_id', obraId).single()
+    if (!nom) {
+      const { data } = await supabase.from('nominas_obra')
+        .insert({ semana_id: semana.id, obra_id: obraId, residente_id: perfil.id })
+        .select().single()
+      nom = data
+    }
+    setNominasPorObra(prev => ({...prev, [obraId]: nom.id}))
+    return nom.id
+  }
+
+  async function guardar() {
+    if (!semana) return
+    setGuardando(true)
+    for (const t of (trabajadores||[])) {
+      const obraId = obraSeleccionada[t.id]
+      if (!obraId) continue
+      const nominaId = await getNominaId(obraId)
+      const a = asistencias[t.id] || {}
+      const dias = calcularDias(a)
+      await supabase.from('asistencias').upsert({
+        nomina_obra_id: nominaId, trabajador_id: t.id,
+        viernes: parseFloat(a.viernes)||0, sabado: parseFloat(a.sabado)||0,
+        domingo: parseFloat(a.domingo)||0, lunes: parseFloat(a.lunes)||0,
+        martes: parseFloat(a.martes)||0, miercoles: parseFloat(a.miercoles)||0,
+        jueves: parseFloat(a.jueves)||0, dias_total: dias,
+        horas_extra: parseFloat(a.horas_extra)||0,
+        prestamos: 0, bono_aplicado: 0, total_pagar: 0
+      }, { onConflict: 'nomina_obra_id,trabajador_id' })
+    }
+    setGuardando(false)
+    onGuardado()
+  }
+
+  const totalAsignados = (trabajadores||[]).filter(t => obraSeleccionada[t.id]).length
+  const filtrados = (trabajadores||[]).filter(t => {
+    if (filtro === 'asignados') return !!obraSeleccionada[t.id]
+    if (filtro === 'sin-asignar') return !obraSeleccionada[t.id]
+    return true
+  })
+
+  return (
+    <div>
+      <div className="bg-white rounded-2xl border border-gray-100 p-3 mb-3 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <span className="font-medium text-sm text-gray-900">Personal sin asignar esta semana</span>
+          <p className="text-xs text-gray-400 mt-0.5">Asigna obra y asistencia a los trabajadores que quedaron sin capturar</p>
+        </div>
+        <button onClick={guardar} disabled={guardando || totalAsignados===0}
+          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+          {guardando ? 'Guardando...' : `💾 Guardar (${totalAsignados} trabajadores)`}
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex gap-1">
+          {[['todos','Todos'],['asignados','Asignados'],['sin-asignar','Sin asignar']].map(([val,lbl]) => (
+            <button key={val} onClick={() => setFiltro(val)}
+              className={`px-3 py-1 rounded-full text-xs border font-medium ${filtro===val?'bg-blue-600 text-white border-blue-600':'bg-white text-gray-500 border-gray-200'}`}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-gray-400">{totalAsignados} de {(trabajadores||[]).length} asignados</span>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table style={{borderCollapse:'collapse',fontSize:'12px',whiteSpace:'nowrap',width:'100%'}}>
+            <thead>
+              <tr style={{background:'#f9fafb',borderBottom:'1px solid #f3f4f6'}}>
+                <th style={{textAlign:'left',padding:'8px',color:'#9ca3af',fontWeight:500}}>#</th>
+                <th style={{textAlign:'left',padding:'8px',color:'#9ca3af',fontWeight:500,minWidth:'180px'}}>Trabajador</th>
+                <th style={{textAlign:'left',padding:'8px',color:'#9ca3af',fontWeight:500}}>Puesto</th>
+                <th style={{textAlign:'left',padding:'8px',color:'#9ca3af',fontWeight:500,minWidth:'120px'}}>Obra</th>
+                {DIAS_LABEL.map(d => <th key={d} style={{textAlign:'center',padding:'8px 3px',color:'#9ca3af',fontWeight:500,width:'48px'}}>{d}</th>)}
+                <th style={{textAlign:'center',padding:'8px',color:'#9ca3af',fontWeight:500,width:'44px'}}>Días</th>
+                <th style={{textAlign:'center',padding:'8px',color:'#9ca3af',fontWeight:500,width:'58px'}}>H.Extra</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtrados.filter(t => t && t.nombre).map(t => {
+                const a = asistencias[t.id] || {}
+                const obraId = obraSeleccionada[t.id]
+                const sinObra = !obraId
+                const dias = calcularDias(a)
+                const tieneFalta = dias < 6
+                return (
+                  <tr key={t.id} style={{borderBottom:'1px solid #f9fafb', background: sinObra?'#fafafa':tieneFalta?'#fff5f5':'white'}}>
+                    <td style={{padding:'5px 8px',color:'#d1d5db',fontSize:'11px'}}>{String(t.num_empleado||'').padStart(4,'0')}</td>
+                    <td style={{padding:'5px 8px',fontWeight:500,color:sinObra?'#9ca3af':'#111827'}}>{t.nombre}</td>
+                    <td style={{padding:'5px 8px',color:'#6b7280',fontSize:'11px'}}>{t.puesto}</td>
+                    <td style={{padding:'5px 8px'}}>
+                      <select value={obraId||''} onChange={e => setObraSeleccionada(prev=>({...prev,[t.id]:e.target.value}))}
+                        style={{fontSize:'11px',border:'1px solid',borderColor:obraId?'#93c5fd':'#e5e7eb',borderRadius:'6px',padding:'2px 4px',width:'115px',background:obraId?'#eff6ff':'white',color:obraId?'#1d4ed8':'#6b7280'}}>
+                        <option value="">— Sin asignar —</option>
+                        {obras.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+                      </select>
+                    </td>
+                    {DIAS.map(d => (
+                      <td key={d} style={{padding:'3px 2px',textAlign:'center'}}>
+                        <select value={a[d]??1.1}
+                          onChange={e => setAsistencias(prev=>({...prev,[t.id]:{...prev[t.id],[d]:parseFloat(e.target.value)}}))}
+                          disabled={sinObra}
+                          style={{fontSize:'11px',border:'1px solid',borderColor:parseFloat(a[d])===0?'#fca5a5':'#e5e7eb',borderRadius:'4px',padding:'2px 1px',width:'44px',textAlign:'center',background:parseFloat(a[d])===0?'#fef2f2':sinObra?'#f9fafb':'white',color:parseFloat(a[d])===0?'#ef4444':sinObra?'#d1d5db':'#374151'}}>
+                          <option value={1.1}>✓</option>
+                          <option value={0.5}>½</option>
+                          <option value={0}>✗</option>
+                        </select>
+                      </td>
+                    ))}
+                    <td style={{padding:'5px 6px',textAlign:'center',fontWeight:600,color:sinObra?'#d1d5db':tieneFalta?'#ef4444':'#374151'}}>
+                      {sinObra?'—':dias%1===0?dias:dias.toFixed(1)}
+                    </td>
+                    <td style={{padding:'3px 4px',textAlign:'center'}}>
+                      <input type="number" min="0" step="0.5" value={a.horas_extra||''} placeholder="0"
+                        disabled={sinObra}
+                        onChange={e => setAsistencias(prev=>({...prev,[t.id]:{...prev[t.id],horas_extra:e.target.value}}))}
+                        style={{width:'48px',fontSize:'11px',border:'1px solid #e5e7eb',borderRadius:'4px',padding:'2px 3px',textAlign:'center',background:sinObra?'#f9fafb':'white'}} />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SuperView({ perfil }) {
   const [semanas, setSemanas] = useState([])
   const [semanaActual, setSemanaActual] = useState(null)
@@ -23,8 +187,6 @@ export default function SuperView({ perfil }) {
   const [nominaOficina, setNominaOficina] = useState(null)
   const [guardandoOficina, setGuardandoOficina] = useState(false)
 
-  const DIAS = ['viernes','sabado','domingo','lunes','martes','miercoles','jueves']
-  const DIAS_LABEL = ['Vie','Sáb','Dom','Lun','Mar','Mié','Jue']
 
   useEffect(() => { cargarTodo() }, [])
   useEffect(() => { if (semanaActual) { cargarNominas(); cargarIncidencias(); cargarOficina() } }, [semanaActual])
@@ -35,9 +197,8 @@ export default function SuperView({ perfil }) {
     if (data && data.length > 0) setSemanaActual(data[0])
 
     // Obras inactivas
-    const { data: inact } = await supabase.from('obras').select('*').eq('activa', false).order('nombre', { ascending: true })
-    console.log('obras inactivas:', inact)
-setObrasInactivas(inact || [])
+    const { data: inact } = await supabase.from('obras').select('*').eq('activa', false).order('nombre')
+    setObrasInactivas(inact || [])
 
     // Trabajadores sin obra fija (obra_id null)
     const { data: sinObra } = await supabase.from('trabajadores')
@@ -452,33 +613,13 @@ setObrasInactivas(inact || [])
 
       {/* TAB: SIN OBRA */}
       {tab === 'sin-obra' && (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="p-3 border-b border-gray-100">
-            <span className="font-medium text-sm text-gray-900">Personal sin obra asignada</span>
-          </div>
-          {trabajadoresSinObra.length === 0 ? (
-            <div className="text-center py-10 text-gray-400 text-sm">Todo el personal tiene obra asignada</div>
-          ) : (
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
-              <thead>
-                <tr style={{background:'#f9fafb',borderBottom:'1px solid #f3f4f6'}}>
-                  <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>#</th>
-                  <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Trabajador</th>
-                  <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Puesto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trabajadoresSinObra.filter(t => t && t.nombre).map(t => (
-                  <tr key={t.id} style={{borderBottom:'1px solid #f9fafb'}}>
-                    <td style={{padding:'8px 12px',color:'#9ca3af'}}>{String(t.num_empleado||'').padStart(4,'0')}</td>
-                    <td style={{padding:'8px 12px',fontWeight:500}}>{t.nombre}</td>
-                    <td style={{padding:'8px 12px',color:'#6b7280'}}>{t.puesto||'—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <SinObraCaptura
+          trabajadores={trabajadoresSinObra}
+          semana={semanaActual}
+          perfil={perfil}
+          supabase={supabase}
+          onGuardado={() => { cargarNominas(); setMsg('✓ Guardado'); setTimeout(()=>setMsg(''),2000) }}
+        />
       )}
 
       {/* TAB: OBRAS INACTIVAS */}
