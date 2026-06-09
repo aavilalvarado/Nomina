@@ -5,10 +5,10 @@ const DIAS = ['viernes','sabado','domingo','lunes','martes','miercoles','jueves'
 const DIAS_LABEL = ['Vie','Sáb','Dom','Lun','Mar','Mié','Jue']
 
 function calcularDias(asistencia) {
-  return DIAS.reduce((sum, d) => {
+  return Math.round(DIAS.reduce((sum, d) => {
     const v = parseFloat(asistencia[d])
-    return sum + (v === 1.1 ? 1 : isNaN(v) ? 0 : v)
-  }, 0)
+    return sum + (isNaN(v) ? 0 : v)
+  }, 0) * 10) / 10
 }
 
 export default function ResidenteView({ perfil }) {
@@ -52,6 +52,7 @@ export default function ResidenteView({ perfil }) {
       .select('id, obra_id')
       .eq('semana_id', sem.id)
 
+    // Solo nóminas de OTROS residentes (no las propias)
     const nominasOtros = (todasNominas || []).filter(n => !obras.map(o => o.id).includes(n.obra_id))
 
     let trabajadoresYaAsignados = []
@@ -281,7 +282,7 @@ export default function ResidenteView({ perfil }) {
               {trabajadoresFiltrados.map(t => {
                 const a = asistencias[t.id] || {}
                 const dias = calcularDias(a)
-                const tieneFalta = dias < 6
+                const tieneFalta = dias < 6.0
                 const obraId = obraSeleccionada[t.id]
                 const nom = nominasPorObra[obraId]
                 const bloqueado = nom && nom.estado !== 'borrador'
@@ -354,7 +355,7 @@ export default function ResidenteView({ perfil }) {
             <tfoot>
               <tr style={{borderTop:'2px solid #e5e7eb', background:'#f9fafb'}}>
                 <td colSpan={11} style={{padding:'8px', fontSize:'11px', color:'#9ca3af'}}>
-                  {totalAsignados} trabajadores asignados · {trabajadores.filter(t => obraSeleccionada[t.id] && calcularDias(asistencias[t.id]||{}) < 6).length} con falta
+                  {totalAsignados} trabajadores asignados · {trabajadores.filter(t => obraSeleccionada[t.id] && calcularDias(asistencias[t.id]||{}) < 6.0).length} con falta
                 </td>
                 <td style={{padding:'8px', textAlign:'center', fontSize:'11px', fontWeight:600, color:'#374151'}}>
                   {trabajadores.reduce((s,t) => s + (parseFloat((asistencias[t.id]||{}).horas_extra)||0), 0)}h
