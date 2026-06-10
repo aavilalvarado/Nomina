@@ -499,22 +499,7 @@ export default function SuperView({ perfil }) {
 
     const rows = []
     // Encabezado
-    rows.push(['Código', 'Nombre Empleado', 
-      diasSemana[0]+'
-VIERNES',
-      diasSemana[1]+'
-SÁBADO', 
-      diasSemana[2]+'
-DOMINGO',
-      diasSemana[3]+'
-LUNES',
-      diasSemana[4]+'
-MARTES',
-      diasSemana[5]+'
-MIÉRCOLES',
-      diasSemana[6]+'
-JUEVES'
-    ])
+    rows.push(['Código', 'Nombre Empleado', diasSemana[0]+' VIERNES', diasSemana[1]+' SÁBADO', diasSemana[2]+' DOMINGO', diasSemana[3]+' LUNES', diasSemana[4]+' MARTES', diasSemana[5]+' MIÉRCOLES', diasSemana[6]+' JUEVES'])
 
     // Solo trabajadores con incidencias
     let conIncidencias = 0
