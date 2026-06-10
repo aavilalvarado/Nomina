@@ -166,6 +166,124 @@ function SinObraCaptura({ trabajadores, semana, perfil, supabase, onGuardado }) 
   )
 }
 
+
+function IncidenciasPreview({ semana, supabase }) {
+  const [filas, setFilas] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [fechas, setFechas] = useState([])
+
+  useEffect(() => { if (semana) cargar() }, [semana])
+
+  async function cargar() {
+    setCargando(true)
+    // Calcular fechas de la semana
+    const inicio = new Date(semana.fecha_inicio)
+    const dias = []
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(inicio)
+      d.setDate(d.getDate() + i)
+      dias.push(d.toLocaleDateString('es-MX', {day:'2-digit',month:'2-digit'}))
+    }
+    setFechas(dias)
+
+    const { data: nominas } = await supabase
+      .from('nominas_obra').select('id').eq('semana_id', semana.id)
+    
+    const empleadosMap = {}
+    for (const nom of (nominas || [])) {
+      const { data: asist } = await supabase
+        .from('asistencias')
+        .select('*, trabajador:trabajadores(num_empleado, nombre)')
+        .eq('nomina_obra_id', nom.id)
+      ;(asist || []).forEach(a => {
+        if (!a.trabajador) return
+        const t = a.trabajador
+        empleadosMap[t.num_empleado] = {
+          codigo: String(t.num_empleado).padStart(3,'0'),
+          nombre: t.nombre,
+          vie: parseFloat(a.viernes)||0, sab: parseFloat(a.sabado)||0,
+          lun: parseFloat(a.lunes)||0, mar: parseFloat(a.martes)||0,
+          mie: parseFloat(a.miercoles)||0, jue: parseFloat(a.jueves)||0,
+          he: parseFloat(a.horas_extra)||0,
+        }
+      })
+    }
+
+    const getClave = (val, he=0, esSab=false) => {
+      if (he > 0) return { clave: `${Math.round(he)}HE2`, color: '#00B050' }
+      if (val === 0) return { clave: '1FINJ', color: '#FF0000' }
+      return { clave: '', color: '' }
+    }
+
+    const resultado = []
+    Object.values(empleadosMap).sort((a,b) => a.codigo.localeCompare(b.codigo)).forEach(emp => {
+      const claves = [
+        getClave(emp.vie),
+        emp.sab === 0 ? { clave:'1FINJ', color:'#FF0000' } : { clave:'', color:'' },
+        { clave:'', color:'' },
+        getClave(emp.lun),
+        getClave(emp.mar),
+        getClave(emp.mie),
+        emp.he > 0 ? { clave:`${Math.round(emp.he)}HE2`, color:'#00B050' } : getClave(emp.jue),
+      ]
+      if (claves.some(c => c.clave)) {
+        resultado.push({ ...emp, claves })
+      }
+    })
+    setFilas(resultado)
+    setCargando(false)
+  }
+
+  const DIAS_LABEL = ['VIERNES','SÁBADO','DOMINGO','LUNES','MARTES','MIÉRCOLES','JUEVES']
+
+  if (cargando) return <div className="text-center py-8 text-gray-400 text-sm">Cargando...</div>
+  if (filas.length === 0) return <div className="text-center py-8 text-gray-400 text-sm">No hay incidencias registradas esta semana</div>
+
+  return (
+    <div className="overflow-x-auto">
+      <table style={{borderCollapse:'collapse',fontSize:'12px',whiteSpace:'nowrap',width:'100%'}}>
+        <thead>
+          <tr style={{background:'#f9fafb',borderBottom:'1px solid #e5e7eb'}}>
+            <th style={{textAlign:'left',padding:'8px 10px',color:'#9ca3af',fontWeight:500}}>Código</th>
+            <th style={{textAlign:'left',padding:'8px 10px',color:'#9ca3af',fontWeight:500,minWidth:'200px'}}>Trabajador</th>
+            {DIAS_LABEL.map((d,i) => (
+              <th key={d} style={{textAlign:'center',padding:'8px 6px',color:'#9ca3af',fontWeight:500,minWidth:'80px'}}>
+                <div>{fechas[i]}</div>
+                <div style={{fontSize:'10px'}}>{d}</div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f,idx) => (
+            <tr key={f.codigo} style={{borderBottom:'1px solid #f9fafb',background:idx%2===0?'white':'#f9fafb'}}>
+              <td style={{padding:'7px 10px',fontWeight:600,color:'#374151'}}>{f.codigo}</td>
+              <td style={{padding:'7px 10px',color:'#374151'}}>{f.nombre}</td>
+              {f.claves.map((c,i) => (
+                <td key={i} style={{padding:'7px 6px',textAlign:'center',fontWeight:c.clave?700:400,color:c.color||'#d1d5db',fontFamily:'monospace',fontSize:'11px'}}>
+                  {c.clave || '—'}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr style={{background:'#f0f4ff',borderTop:'2px solid #e5e7eb'}}>
+            <td colSpan={2} style={{padding:'8px 10px',fontWeight:600,fontSize:'12px',color:'#374151'}}>
+              {filas.length} trabajadores con incidencias
+            </td>
+            <td colSpan={7} style={{padding:'8px 10px',textAlign:'right',fontSize:'11px',color:'#9ca3af'}}>
+              <span style={{color:'#FF0000',fontWeight:600}}>1FINJ</span> = Falta &nbsp;|&nbsp;
+              <span style={{color:'#FF9900',fontWeight:600}}>5RET</span> = Retardo &nbsp;|&nbsp;
+              <span style={{color:'#00B050',fontWeight:600}}>xHE2</span> = Horas Extra
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  )
+}
+
 export default function SuperView({ perfil }) {
   const [semanas, setSemanas] = useState([])
   const [semanaActual, setSemanaActual] = useState(null)
@@ -327,6 +445,105 @@ export default function SuperView({ perfil }) {
     cargarTodo()
   }
 
+  async function exportarCONTPAQi() {
+    const XLSX = await import('xlsx')
+    const { data: todasNominas } = await supabase
+      .from('nominas_obra')
+      .select('*, obra:obras(nombre)')
+      .eq('semana_id', semanaActual.id)
+
+    // Obtener todos los trabajadores con sus asistencias
+    const empleadosMap = {}
+    for (const nom of (todasNominas || [])) {
+      const { data: asist } = await supabase
+        .from('asistencias')
+        .select('*, trabajador:trabajadores(num_empleado, nombre)')
+        .eq('nomina_obra_id', nom.id)
+      ;(asist || []).forEach(a => {
+        const t = a.trabajador
+        if (!t) return
+        empleadosMap[t.num_empleado] = {
+          codigo: String(t.num_empleado).padStart(3,'0'),
+          nombre: t.nombre,
+          vie: parseFloat(a.viernes) || 0,
+          sab: parseFloat(a.sabado) || 0,
+          lun: parseFloat(a.lunes) || 0,
+          mar: parseFloat(a.martes) || 0,
+          mie: parseFloat(a.miercoles) || 0,
+          jue: parseFloat(a.jueves) || 0,
+          he: parseFloat(a.horas_extra) || 0,
+        }
+      })
+    }
+
+    // Calcular incidencias
+    const getClave = (val, he=0) => {
+      if (he > 0) return `${Math.round(he)}HE2`
+      if (val === 0) return '1FINJ'
+      return ''
+    }
+
+    // Fechas de la semana
+    const fechas = [
+      semanaActual.fecha_inicio, // viernes
+      '', '', '', '', '', ''      // sab, dom, lun, mar, mie, jue - calcular
+    ]
+
+    // Calcular fechas de la semana
+    const fechaInicio = new Date(semanaActual.fecha_inicio)
+    const diasSemana = []
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(fechaInicio)
+      d.setDate(d.getDate() + i)
+      diasSemana.push(d.toLocaleDateString('es-MX', {day:'2-digit',month:'2-digit',year:'numeric'}))
+    }
+
+    const rows = []
+    // Encabezado
+    rows.push(['Código', 'Nombre Empleado', 
+      diasSemana[0]+'
+VIERNES',
+      diasSemana[1]+'
+SÁBADO', 
+      diasSemana[2]+'
+DOMINGO',
+      diasSemana[3]+'
+LUNES',
+      diasSemana[4]+'
+MARTES',
+      diasSemana[5]+'
+MIÉRCOLES',
+      diasSemana[6]+'
+JUEVES'
+    ])
+
+    // Solo trabajadores con incidencias
+    let conIncidencias = 0
+    Object.values(empleadosMap).sort((a,b) => a.codigo.localeCompare(b.codigo)).forEach(emp => {
+      const claves = [
+        getClave(emp.vie),
+        emp.sab === 0 ? '1FINJ' : '',
+        '', // domingo
+        getClave(emp.lun),
+        getClave(emp.mar),
+        getClave(emp.mie),
+        emp.he > 0 ? `${Math.round(emp.he)}HE2` : getClave(emp.jue),
+      ]
+      if (claves.some(c => c)) {
+        rows.push([emp.codigo, emp.nombre, ...claves])
+        conIncidencias++
+      }
+    })
+
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet(rows)
+    ws['!cols'] = [{wch:10},{wch:38},{wch:14},{wch:14},{wch:14},{wch:14},{wch:14},{wch:16},{wch:14}]
+    XLSX.utils.book_append_sheet(wb, ws, `Incidencias Sem${semanaActual.semana_num}`)
+    XLSX.writeFile(wb, `Incidencias_CONTPAQi_Sem${semanaActual.semana_num}.xlsx`)
+    setMsg(`✓ ${conIncidencias} trabajadores con incidencias exportados`)
+    setTimeout(() => setMsg(''), 3000)
+  }
+
   async function cerrarSemana() {
     if (!confirm('¿Cerrar esta semana?')) return
     await supabase.from('semanas').update({ estado:'cerrada' }).eq('id', semanaActual.id)
@@ -372,6 +589,7 @@ export default function SuperView({ perfil }) {
     { id:'bajas', label:'🚫 Bajas', badge: bajas.length || null },
     { id:'sin-obra', label:'👷 Sin obra', badge: trabajadoresSinObra.length || null },
     { id:'obras-inactivas', label:'📁 Obras inactivas', badge: obrasInactivas.length || null },
+    { id:'contpaqi', label:'📊 CONTPAQi', badge: null },
   ]
 
   return (
@@ -620,6 +838,40 @@ export default function SuperView({ perfil }) {
           supabase={supabase}
           onGuardado={() => { cargarNominas(); setMsg('✓ Guardado'); setTimeout(()=>setMsg(''),2000) }}
         />
+      )}
+
+      {/* TAB: CONTPAQI */}
+      {tab === 'contpaqi' && (
+        <div>
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-4">
+            <h3 className="font-semibold text-gray-900 mb-2">Exportar incidencias para CONTPAQi</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Genera el archivo Excel con las claves de incidencias listo para importar en CONTPAQi Nóminas → Prenómina → Capturar movimientos desde Excel.
+            </p>
+            <div className="bg-gray-50 rounded-xl p-4 mb-4 text-sm">
+              <div className="font-medium text-gray-700 mb-2">Claves que se generan automáticamente:</div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2"><span className="text-red-600 font-mono font-bold">1FINJ</span><span className="text-gray-500">— Falta injustificada (día con valor 0)</span></div>
+                <div className="flex items-center gap-2"><span className="text-orange-500 font-mono font-bold">5RET</span><span className="text-gray-500">— Retardo / Medio día</span></div>
+                <div className="flex items-center gap-2"><span className="text-green-600 font-mono font-bold">xHE2</span><span className="text-gray-500">— Horas extra dobles (x = número de horas)</span></div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={exportarCONTPAQi}
+                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm">
+                📊 Generar archivo CONTPAQi
+              </button>
+              <span className="text-xs text-gray-400">Solo incluye trabajadores con al menos una incidencia</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="p-3 border-b border-gray-100">
+              <span className="font-medium text-sm text-gray-900">Vista previa de incidencias — Semana {semanaActual?.semana_num}</span>
+            </div>
+            <IncidenciasPreview semana={semanaActual} supabase={supabase} />
+          </div>
+        </div>
       )}
 
       {/* TAB: OBRAS INACTIVAS */}
