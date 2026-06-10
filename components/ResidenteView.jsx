@@ -24,6 +24,7 @@ export default function ResidenteView({ perfil }) {
   const [filtro, setFiltro] = useState('todos')
   const [fechasIncidencia, setFechasIncidencia] = useState({})
   const [cargando, setCargando] = useState(true)
+  const [prestamosActivos, setPrestamosActivos] = useState({}) // trabajador_id -> true
 
   useEffect(() => { cargarDatos() }, [])
 
@@ -106,6 +107,15 @@ export default function ResidenteView({ perfil }) {
     })
     setAsistencias(asistInit)
     setObraSeleccionada(obraSelecInit)
+    // Cargar préstamos activos
+    const { data: prests } = await supabase
+      .from('prestamos')
+      .select('trabajador_id')
+      .eq('activo', true)
+    const prestMap = {}
+    ;(prests || []).forEach(p => { prestMap[p.trabajador_id] = true })
+    setPrestamosActivos(prestMap)
+
     setCargando(false)
   }
 
