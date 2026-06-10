@@ -301,6 +301,13 @@ export default function SuperView({ perfil }) {
   const [trabajadoresOficina, setTrabajadoresOficina] = useState([])
   const [incidencias, setIncidencias] = useState([])
   const [obrasInactivas, setObrasInactivas] = useState([])
+  const [todosObras, setTodosObras] = useState([])
+  const [nuevoTrabajador, setNuevoTrabajador] = useState({
+    num_empleado:'', nombre:'', puesto:'', obra_id:'', forma_pago:'TRANSFERENCIA', sueldo_semanal:'', tiene_bono:true
+  })
+  const [guardandoTrab, setGuardandoTrab] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
+  const [todosTrabajadores, setTodosTrabajadores] = useState([])
   const [asistOficina, setAsistOficina] = useState({})
   const [nominaOficina, setNominaOficina] = useState(null)
   const [guardandoOficina, setGuardandoOficina] = useState(false)
@@ -317,6 +324,15 @@ export default function SuperView({ perfil }) {
     // Obras inactivas
     const { data: inact } = await supabase.from('obras').select('*').eq('activa', false).order('nombre')
     setObrasInactivas(inact || [])
+
+    // Todas las obras para formulario
+    const { data: todasO } = await supabase.from('obras').select('id,nombre').order('nombre')
+    setTodosObras(todasO || [])
+
+    // Todos los trabajadores
+    const { data: todosT } = await supabase.from('trabajadores')
+      .select('*, obra:obras(nombre)').eq('activo', true).order('num_empleado')
+    setTodosTrabajadores(todosT || [])
 
     // Trabajadores sin obra fija (obra_id null)
     const { data: sinObra } = await supabase.from('trabajadores')
@@ -574,6 +590,7 @@ export default function SuperView({ perfil }) {
     { id:'sin-obra', label:'👷 Sin obra', badge: trabajadoresSinObra.length || null },
     { id:'obras-inactivas', label:'📁 Obras inactivas', badge: obrasInactivas.length || null },
     { id:'contpaqi', label:'📊 CONTPAQi', badge: null },
+    { id:'personal', label:'👷 Personal', badge: null },
   ]
 
   return (
@@ -854,6 +871,161 @@ export default function SuperView({ perfil }) {
               <span className="font-medium text-sm text-gray-900">Vista previa de incidencias — Semana {semanaActual?.semana_num}</span>
             </div>
             <IncidenciasPreview semana={semanaActual} supabase={supabase} />
+          </div>
+        </div>
+      )}
+
+      {/* TAB: PERSONAL */}
+      {tab === 'personal' && (
+        <div>
+          {/* Formulario alta trabajador */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
+            <h3 className="font-semibold text-gray-900 mb-3 text-sm">➕ Dar de alta nuevo trabajador</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">No. Empleado</label>
+                <input type="number" placeholder="095"
+                  value={nuevoTrabajador.num_empleado}
+                  onChange={e => setNuevoTrabajador(p=>({...p,num_empleado:e.target.value}))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs text-gray-500 mb-1 block">Nombre completo</label>
+                <input type="text" placeholder="APELLIDO APELLIDO NOMBRE"
+                  value={nuevoTrabajador.nombre}
+                  onChange={e => setNuevoTrabajador(p=>({...p,nombre:e.target.value.toUpperCase()}))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Puesto</label>
+                <input type="text" placeholder="OFICIAL ALBAÑIL"
+                  value={nuevoTrabajador.puesto}
+                  onChange={e => setNuevoTrabajador(p=>({...p,puesto:e.target.value.toUpperCase()}))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Obra</label>
+                <select value={nuevoTrabajador.obra_id}
+                  onChange={e => setNuevoTrabajador(p=>({...p,obra_id:e.target.value}))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                  <option value="">— Seleccionar —</option>
+                  {todosObras.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Forma de pago</label>
+                <select value={nuevoTrabajador.forma_pago}
+                  onChange={e => setNuevoTrabajador(p=>({...p,forma_pago:e.target.value}))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                  <option>TRANSFERENCIA</option>
+                  <option>EFECTIVO</option>
+                  <option>CHEQUE</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 mb-1 block">Sueldo semanal</label>
+                <input type="number" placeholder="3500"
+                  value={nuevoTrabajador.sueldo_semanal}
+                  onChange={e => setNuevoTrabajador(p=>({...p,sueldo_semanal:e.target.value}))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+              </div>
+              <div className="flex items-end">
+                <label className="flex items-center gap-2 text-sm text-gray-600 mb-2 cursor-pointer">
+                  <input type="checkbox" checked={nuevoTrabajador.tiene_bono}
+                    onChange={e => setNuevoTrabajador(p=>({...p,tiene_bono:e.target.checked}))}
+                    className="w-4 h-4" />
+                  Tiene bono
+                </label>
+              </div>
+            </div>
+            <div className="flex justify-end mt-3">
+              <button disabled={guardandoTrab || !nuevoTrabajador.nombre || !nuevoTrabajador.num_empleado}
+                onClick={async () => {
+                  setGuardandoTrab(true)
+                  const { error } = await supabase.from('trabajadores').insert({
+                    num_empleado: parseInt(nuevoTrabajador.num_empleado),
+                    nombre: nuevoTrabajador.nombre.trim(),
+                    puesto: nuevoTrabajador.puesto.trim(),
+                    obra_id: nuevoTrabajador.obra_id || null,
+                    forma_pago: nuevoTrabajador.forma_pago,
+                    sueldo_semanal: parseFloat(nuevoTrabajador.sueldo_semanal) || 0,
+                    tiene_bono: nuevoTrabajador.tiene_bono,
+                    activo: true
+                  })
+                  if (error) { alert('Error: ' + error.message) }
+                  else {
+                    setMsg('✓ Trabajador dado de alta')
+                    setNuevoTrabajador({num_empleado:'',nombre:'',puesto:'',obra_id:'',forma_pago:'TRANSFERENCIA',sueldo_semanal:'',tiene_bono:true})
+                    const { data } = await supabase.from('trabajadores').select('*, obra:obras(nombre)').eq('activo', true).order('num_empleado')
+                    setTodosTrabajadores(data || [])
+                    setTimeout(()=>setMsg(''),3000)
+                  }
+                  setGuardandoTrab(false)
+                }}
+                className="px-6 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium">
+                {guardandoTrab ? 'Guardando...' : '✓ Dar de alta'}
+              </button>
+            </div>
+          </div>
+
+          {/* Lista de trabajadores */}
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+              <span className="font-medium text-sm text-gray-900">
+                Trabajadores activos ({todosTrabajadores.length})
+              </span>
+              <input type="text" placeholder="Buscar por nombre o número..."
+                value={busqueda} onChange={e => setBusqueda(e.target.value)}
+                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-64" />
+            </div>
+            <div className="overflow-x-auto">
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
+                <thead>
+                  <tr style={{background:'#f9fafb',borderBottom:'1px solid #f3f4f6'}}>
+                    <th style={{textAlign:'left',padding:'8px 10px',color:'#9ca3af',fontWeight:500}}>#</th>
+                    <th style={{textAlign:'left',padding:'8px 10px',color:'#9ca3af',fontWeight:500,minWidth:'200px'}}>Nombre</th>
+                    <th style={{textAlign:'left',padding:'8px 10px',color:'#9ca3af',fontWeight:500}}>Puesto</th>
+                    <th style={{textAlign:'left',padding:'8px 10px',color:'#9ca3af',fontWeight:500}}>Obra</th>
+                    <th style={{textAlign:'left',padding:'8px 10px',color:'#9ca3af',fontWeight:500}}>Pago</th>
+                    <th style={{textAlign:'right',padding:'8px 10px',color:'#7c3aed',fontWeight:500}}>Sueldo</th>
+                    <th style={{textAlign:'center',padding:'8px 10px',color:'#9ca3af',fontWeight:500}}>Bono</th>
+                    <th style={{textAlign:'center',padding:'8px 10px',color:'#9ca3af',fontWeight:500}}>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {todosTrabajadores
+                    .filter(t => !busqueda || t.nombre.toLowerCase().includes(busqueda.toLowerCase()) || String(t.num_empleado).includes(busqueda))
+                    .map((t,idx) => (
+                    <tr key={t.id} style={{borderBottom:'1px solid #f9fafb',background:idx%2===0?'white':'#fafafa'}}>
+                      <td style={{padding:'7px 10px',color:'#9ca3af',fontFamily:'monospace'}}>{String(t.num_empleado).padStart(4,'0')}</td>
+                      <td style={{padding:'7px 10px',fontWeight:500,color:'#111827'}}>{t.nombre}</td>
+                      <td style={{padding:'7px 10px',color:'#6b7280',fontSize:'11px'}}>{t.puesto}</td>
+                      <td style={{padding:'7px 10px'}}>
+                        <span style={{fontSize:'11px',background:'#eff6ff',color:'#1d4ed8',padding:'2px 8px',borderRadius:'10px'}}>
+                          {t.obra?.nombre || '—'}
+                        </span>
+                      </td>
+                      <td style={{padding:'7px 10px',color:'#6b7280',fontSize:'11px'}}>{t.forma_pago}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',fontWeight:600,color:'#7c3aed'}}>${t.sueldo_semanal?.toLocaleString('es-MX')}</td>
+                      <td style={{padding:'7px 10px',textAlign:'center'}}>
+                        {t.tiene_bono ? <span style={{color:'#16a34a',fontSize:'13px'}}>✓</span> : <span style={{color:'#d1d5db'}}>—</span>}
+                      </td>
+                      <td style={{padding:'7px 10px',textAlign:'center'}}>
+                        <button onClick={async () => {
+                          if (!confirm(`¿Dar de baja a ${t.nombre}?`)) return
+                          await supabase.from('trabajadores').update({activo:false}).eq('id',t.id)
+                          setTodosTrabajadores(prev => prev.filter(x => x.id !== t.id))
+                          setMsg('✓ Trabajador dado de baja')
+                          setTimeout(()=>setMsg(''),3000)
+                        }} style={{fontSize:'11px',color:'#ef4444',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'6px',padding:'2px 8px',cursor:'pointer'}}>
+                          Baja
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
