@@ -446,7 +446,6 @@ export default function SuperView({ perfil }) {
   }
 
   async function exportarCONTPAQi() {
-    const XLSX = await import('xlsx')
     const { data: todasNominas } = await supabase
       .from('nominas_obra')
       .select('*, obra:obras(nombre)')
