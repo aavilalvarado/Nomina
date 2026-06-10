@@ -308,6 +308,12 @@ export default function SuperView({ perfil }) {
   const [guardandoTrab, setGuardandoTrab] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [todosTrabajadores, setTodosTrabajadores] = useState([])
+  const [prestamos, setPrestamos] = useState([])
+  const [showNuevoPrestamo, setShowNuevoPrestamo] = useState(false)
+  const [nuevoPrestamo, setNuevoPrestamo] = useState({
+    trabajador_id:'', monto_total:'', descuento_semanal:'', fecha_autorizacion: new Date().toISOString().split('T')[0], notas:''
+  })
+  const [guardandoPrestamo, setGuardandoPrestamo] = useState(false)
   const [asistOficina, setAsistOficina] = useState({})
   const [nominaOficina, setNominaOficina] = useState(null)
   const [guardandoOficina, setGuardandoOficina] = useState(false)
@@ -331,8 +337,16 @@ export default function SuperView({ perfil }) {
 
     // Todos los trabajadores
     const { data: todosT } = await supabase.from('trabajadores')
-      .select('*, obra:obras(nombre)').eq('activo', true).order('num_empleado')
+      .select('*, obra:obras(nombre)').eq('activo', true).order('nombre')
     setTodosTrabajadores(todosT || [])
+
+    // Préstamos activos
+    const { data: prests } = await supabase
+      .from('prestamos')
+      .select('*, trabajador:trabajadores(nombre, num_empleado, obra:obras(nombre))')
+      .eq('activo', true)
+      .order('fecha_autorizacion', { ascending: false })
+    setPrestamos(prests || [])
 
     // Trabajadores sin obra fija (obra_id null)
     const { data: sinObra } = await supabase.from('trabajadores')
@@ -591,6 +605,7 @@ export default function SuperView({ perfil }) {
     { id:'obras-inactivas', label:'📁 Obras inactivas', badge: obrasInactivas.length || null },
     { id:'contpaqi', label:'📊 CONTPAQi', badge: null },
     { id:'personal', label:'👷 Personal', badge: null },
+    { id:'prestamos', label:'💰 Préstamos', badge: null },
   ]
 
   return (
@@ -1027,6 +1042,210 @@ export default function SuperView({ perfil }) {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB: PRÉSTAMOS */}
+      {tab === 'prestamos' && (
+        <div>
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">Préstamos activos</h3>
+              <p className="text-xs text-gray-400 mt-0.5">{prestamos.length} préstamos activos · El descuento se aplica automáticamente cada semana</p>
+            </div>
+            <button onClick={() => setShowNuevoPrestamo(true)}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+              + Nuevo préstamo
+            </button>
+          </div>
+
+          {/* Modal nuevo préstamo */}
+          {showNuevoPrestamo && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+                <h3 className="font-semibold mb-4">Autorizar préstamo</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Trabajador</label>
+                    <select value={nuevoPrestamo.trabajador_id}
+                      onChange={e => setNuevoPrestamo(p=>({...p, trabajador_id:e.target.value}))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                      <option value="">— Seleccionar —</option>
+                      {todosTrabajadores.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {(t.num_empleado === 'NA' ? 'NA' : String(t.num_empleado).padStart(4,'0'))} — {t.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Monto total del préstamo</label>
+                      <input type="number" placeholder="2000" value={nuevoPrestamo.monto_total}
+                        onChange={e => setNuevoPrestamo(p=>({...p, monto_total:e.target.value}))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Descuento por semana</label>
+                      <input type="number" placeholder="500" value={nuevoPrestamo.descuento_semanal}
+                        onChange={e => setNuevoPrestamo(p=>({...p, descuento_semanal:e.target.value}))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Fecha de autorización</label>
+                    <input type="date" value={nuevoPrestamo.fecha_autorizacion}
+                      onChange={e => setNuevoPrestamo(p=>({...p, fecha_autorizacion:e.target.value}))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-1 block">Notas (opcional)</label>
+                    <input type="text" placeholder="Motivo del préstamo..."
+                      value={nuevoPrestamo.notas}
+                      onChange={e => setNuevoPrestamo(p=>({...p, notas:e.target.value}))}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  {nuevoPrestamo.monto_total && nuevoPrestamo.descuento_semanal && (
+                    <div className="bg-blue-50 rounded-xl p-3 text-sm text-blue-700">
+                      Semanas para liquidar: <strong>{Math.ceil(parseFloat(nuevoPrestamo.monto_total) / parseFloat(nuevoPrestamo.descuento_semanal))}</strong>
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-2 mt-5">
+                  <button onClick={() => setShowNuevoPrestamo(false)}
+                    className="flex-1 border border-gray-200 rounded-lg py-2 text-sm">Cancelar</button>
+                  <button disabled={guardandoPrestamo || !nuevoPrestamo.trabajador_id || !nuevoPrestamo.monto_total || !nuevoPrestamo.descuento_semanal}
+                    onClick={async () => {
+                      setGuardandoPrestamo(true)
+                      const semanas = Math.ceil(parseFloat(nuevoPrestamo.monto_total) / parseFloat(nuevoPrestamo.descuento_semanal))
+                      const { error } = await supabase.from('prestamos').insert({
+                        trabajador_id: nuevoPrestamo.trabajador_id,
+                        monto_total: parseFloat(nuevoPrestamo.monto_total),
+                        descuento_semanal: parseFloat(nuevoPrestamo.descuento_semanal),
+                        fecha_autorizacion: nuevoPrestamo.fecha_autorizacion,
+                        autorizado_por: perfil.id,
+                        semanas_total: semanas,
+                        semanas_pagadas: 0,
+                        notas: nuevoPrestamo.notas,
+                        activo: true
+                      })
+                      if (error) { alert('Error: ' + error.message) }
+                      else {
+                        setMsg('✓ Préstamo autorizado')
+                        setShowNuevoPrestamo(false)
+                        setNuevoPrestamo({trabajador_id:'',monto_total:'',descuento_semanal:'',fecha_autorizacion:new Date().toISOString().split('T')[0],notas:''})
+                        const { data } = await supabase.from('prestamos')
+                          .select('*, trabajador:trabajadores(nombre, num_empleado, obra:obras(nombre))')
+                          .eq('activo', true).order('fecha_autorizacion', { ascending: false })
+                        setPrestamos(data || [])
+                        setTimeout(()=>setMsg(''),3000)
+                      }
+                      setGuardandoPrestamo(false)
+                    }}
+                    className="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50">
+                    {guardandoPrestamo ? 'Guardando...' : 'Autorizar préstamo'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Lista de préstamos */}
+          {prestamos.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 text-center py-12 text-gray-400 text-sm">
+              No hay préstamos activos
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
+                <thead>
+                  <tr style={{background:'#f9fafb',borderBottom:'1px solid #f3f4f6'}}>
+                    <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500,minWidth:'200px'}}>Trabajador</th>
+                    <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Obra</th>
+                    <th style={{textAlign:'left',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Fecha auth.</th>
+                    <th style={{textAlign:'right',padding:'10px 12px',color:'#7c3aed',fontWeight:500}}>Monto total</th>
+                    <th style={{textAlign:'right',padding:'10px 12px',color:'#7c3aed',fontWeight:500}}>Desc/semana</th>
+                    <th style={{textAlign:'right',padding:'10px 12px',color:'#7c3aed',fontWeight:500}}>Pagado</th>
+                    <th style={{textAlign:'right',padding:'10px 12px',color:'#7c3aed',fontWeight:500}}>Saldo</th>
+                    <th style={{textAlign:'center',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Semanas</th>
+                    <th style={{textAlign:'center',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Progreso</th>
+                    <th style={{textAlign:'center',padding:'10px 12px',color:'#9ca3af',fontWeight:500}}>Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {prestamos.map((p, idx) => {
+                    const pagado = p.semanas_pagadas * p.descuento_semanal
+                    const saldo = p.monto_total - pagado
+                    const pct = Math.min(100, Math.round((p.semanas_pagadas / p.semanas_total) * 100))
+                    const semanasRestantes = p.semanas_total - p.semanas_pagadas
+                    return (
+                      <tr key={p.id} style={{borderBottom:'1px solid #f9fafb',background:idx%2===0?'white':'#fafafa'}}>
+                        <td style={{padding:'10px 12px',fontWeight:500,color:'#111827'}}>
+                          {p.trabajador?.nombre}
+                          {p.notas && <div style={{fontSize:'10px',color:'#9ca3af',marginTop:'2px'}}>{p.notas}</div>}
+                        </td>
+                        <td style={{padding:'10px 12px',color:'#6b7280',fontSize:'11px'}}>{p.trabajador?.obra?.nombre}</td>
+                        <td style={{padding:'10px 12px',color:'#6b7280'}}>{p.fecha_autorizacion}</td>
+                        <td style={{padding:'10px 12px',textAlign:'right',color:'#7c3aed',fontWeight:600}}>${p.monto_total?.toLocaleString('es-MX')}</td>
+                        <td style={{padding:'10px 12px',textAlign:'right',color:'#7c3aed'}}>${p.descuento_semanal?.toLocaleString('es-MX')}</td>
+                        <td style={{padding:'10px 12px',textAlign:'right',color:'#16a34a',fontWeight:600}}>${pagado.toLocaleString('es-MX')}</td>
+                        <td style={{padding:'10px 12px',textAlign:'right',fontWeight:700,color:saldo<=0?'#16a34a':'#ef4444'}}>${Math.max(0,saldo).toLocaleString('es-MX')}</td>
+                        <td style={{padding:'10px 12px',textAlign:'center',color:'#374151'}}>
+                          <div style={{fontSize:'11px',color:'#6b7280'}}>{p.semanas_pagadas}/{p.semanas_total}</div>
+                          <div style={{fontSize:'10px',color:semanasRestantes<=2?'#ef4444':'#9ca3af'}}>{semanasRestantes} restantes</div>
+                        </td>
+                        <td style={{padding:'10px 12px',minWidth:'100px'}}>
+                          <div style={{height:'6px',background:'#e5e7eb',borderRadius:'3px'}}>
+                            <div style={{height:'6px',background:pct>=100?'#16a34a':'#3b82f6',borderRadius:'3px',width:pct+'%',transition:'width .3s'}} />
+                          </div>
+                          <div style={{fontSize:'10px',color:'#9ca3af',textAlign:'center',marginTop:'2px'}}>{pct}%</div>
+                        </td>
+                        <td style={{padding:'10px 12px',textAlign:'center'}}>
+                          <div style={{display:'flex',gap:'4px',justifyContent:'center'}}>
+                            <button onClick={async () => {
+                              const nuevasSemanas = p.semanas_pagadas + 1
+                              if (nuevasSemanas >= p.semanas_total) {
+                                if (confirm('¿Marcar como liquidado? Se eliminará de la lista.')) {
+                                  await supabase.from('prestamos').update({semanas_pagadas: nuevasSemanas, activo: false}).eq('id', p.id)
+                                  setPrestamos(prev => prev.filter(x => x.id !== p.id))
+                                  setMsg('✓ Préstamo liquidado')
+                                  setTimeout(()=>setMsg(''),3000)
+                                }
+                              } else {
+                                await supabase.from('prestamos').update({semanas_pagadas: nuevasSemanas}).eq('id', p.id)
+                                setPrestamos(prev => prev.map(x => x.id===p.id ? {...x, semanas_pagadas: nuevasSemanas} : x))
+                              }
+                            }} style={{fontSize:'11px',background:'#f0fdf4',color:'#16a34a',border:'1px solid #bbf7d0',borderRadius:'6px',padding:'3px 8px',cursor:'pointer'}}>
+                              +1 semana
+                            </button>
+                            <button onClick={async () => {
+                              if (confirm('¿Cancelar este préstamo?')) {
+                                await supabase.from('prestamos').update({activo:false}).eq('id',p.id)
+                                setPrestamos(prev => prev.filter(x => x.id !== p.id))
+                              }
+                            }} style={{fontSize:'11px',background:'#fef2f2',color:'#ef4444',border:'1px solid #fecaca',borderRadius:'6px',padding:'3px 8px',cursor:'pointer'}}>
+                              Cancelar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr style={{background:'#f5f3ff',borderTop:'2px solid #e5e7eb'}}>
+                    <td colSpan={3} style={{padding:'10px 12px',fontWeight:600,color:'#374151'}}>Total préstamos activos</td>
+                    <td style={{padding:'10px 12px',textAlign:'right',fontWeight:700,color:'#7c3aed'}}>${prestamos.reduce((s,p)=>s+p.monto_total,0).toLocaleString('es-MX')}</td>
+                    <td style={{padding:'10px 12px',textAlign:'right',fontWeight:700,color:'#7c3aed'}}>${prestamos.reduce((s,p)=>s+p.descuento_semanal,0).toLocaleString('es-MX')}</td>
+                    <td style={{padding:'10px 12px',textAlign:'right',fontWeight:700,color:'#16a34a'}}>${prestamos.reduce((s,p)=>s+(p.semanas_pagadas*p.descuento_semanal),0).toLocaleString('es-MX')}</td>
+                    <td style={{padding:'10px 12px',textAlign:'right',fontWeight:700,color:'#ef4444'}}>${prestamos.reduce((s,p)=>s+Math.max(0,p.monto_total-(p.semanas_pagadas*p.descuento_semanal)),0).toLocaleString('es-MX')}</td>
+                    <td colSpan={3}></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
