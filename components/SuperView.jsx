@@ -124,7 +124,7 @@ function SinObraCaptura({ trabajadores, semana, perfil, supabase, onGuardado }) 
                 const tieneFalta = dias < 6
                 return (
                   <tr key={t.id} style={{borderBottom:'1px solid #f9fafb', background: sinObra?'#fafafa':tieneFalta?'#fff5f5':'white'}}>
-                    <td style={{padding:'5px 8px',color:'#d1d5db',fontSize:'11px'}}>{String(t.num_empleado||'').padStart(4,'0')}</td>
+                    <td style={{padding:'5px 8px',color:'#d1d5db',fontSize:'11px'}}>{(t.num_empleado == null ? 'NA' : String(t.num_empleado).padStart(4,'0'))}</td>
                     <td style={{padding:'5px 8px',fontWeight:500,color:sinObra?'#9ca3af':'#111827'}}>{t.nombre}</td>
                     <td style={{padding:'5px 8px',color:'#6b7280',fontSize:'11px'}}>{t.puesto}</td>
                     <td style={{padding:'5px 8px'}}>
@@ -574,7 +574,7 @@ export default function SuperView({ perfil }) {
       ;(asist || []).forEach(a => {
         const t = a.trabajador
         rows.push({
-          'No.': (t.num_empleado === 'NA' ? 'NA' : String(t.num_empleado).padStart(4,'0')),
+          'No.': (t.num_empleado == null ? 'NA' : (t.num_empleado == null ? 'NA' : String(t.num_empleado).padStart(4,'0'))),
           'Trabajador': t.nombre, 'Puesto': t.puesto,
           'Obra': nom.obra?.nombre, 'Forma Pago': t.forma_pago,
           'Vie':a.viernes,'Sáb':a.sabado,'Dom':a.domingo,
@@ -729,7 +729,7 @@ export default function SuperView({ perfil }) {
                   const dias = DIAS.reduce((s,d) => s + (parseFloat(a[d])===1.1?1:parseFloat(a[d])||0), 0)
                   return (
                     <tr key={t.id} style={{borderBottom:'1px solid #f9fafb'}}>
-                      <td style={{padding:'6px 8px',color:'#9ca3af'}}>{(t.num_empleado === 'NA' ? 'NA' : String(t.num_empleado).padStart(4,'0'))}</td>
+                      <td style={{padding:'6px 8px',color:'#9ca3af'}}>{(t.num_empleado == null ? 'NA' : (t.num_empleado == null ? 'NA' : String(t.num_empleado).padStart(4,'0')))}</td>
                       <td style={{padding:'6px 8px',fontWeight:500}}>{t.nombre}</td>
                       <td style={{padding:'6px 8px',color:'#6b7280',fontSize:'11px'}}>{t.puesto}</td>
                       {DIAS.map(d => (
@@ -1012,7 +1012,7 @@ export default function SuperView({ perfil }) {
                     .filter(t => !busqueda || t.nombre.toLowerCase().includes(busqueda.toLowerCase()) || String(t.num_empleado).includes(busqueda))
                     .map((t,idx) => (
                     <tr key={t.id} style={{borderBottom:'1px solid #f9fafb',background:idx%2===0?'white':'#fafafa'}}>
-                      <td style={{padding:'7px 10px',color:'#9ca3af',fontFamily:'monospace'}}>{(t.num_empleado === 'NA' ? 'NA' : String(t.num_empleado).padStart(4,'0'))}</td>
+                      <td style={{padding:'7px 10px',color:'#9ca3af',fontFamily:'monospace'}}>{(t.num_empleado == null ? 'NA' : (t.num_empleado == null ? 'NA' : String(t.num_empleado).padStart(4,'0')))}</td>
                       <td style={{padding:'7px 10px',fontWeight:500,color:'#111827'}}>{t.nombre}</td>
                       <td style={{padding:'7px 10px',color:'#6b7280',fontSize:'11px'}}>{t.puesto}</td>
                       <td style={{padding:'7px 10px'}}>
@@ -1074,7 +1074,7 @@ export default function SuperView({ perfil }) {
                       <option value="">— Seleccionar —</option>
                       {todosTrabajadores.map(t => (
                         <option key={t.id} value={t.id}>
-                          {(t.num_empleado === 'NA' ? 'NA' : String(t.num_empleado).padStart(4,'0'))} — {t.nombre}
+                          {(t.num_empleado == null ? 'NA' : (t.num_empleado == null ? 'NA' : String(t.num_empleado).padStart(4,'0')))} — {t.nombre}
                         </option>
                       ))}
                     </select>
