@@ -303,7 +303,7 @@ export default function ResidenteView({ perfil }) {
                 return (
                   <tr key={t.id} style={{borderBottom:'1px solid #f9fafb', background: esBaja ? '#fef2f2' : esVacaciones ? '#f0f9ff' : sinObra ? '#fafafa' : tieneFalta ? '#fff5f5' : 'white'}}>
                     <td style={{padding:'6px 8px', color:'#d1d5db', position:'sticky', left:0, background: sinObra ? '#fafafa' : tieneFalta ? '#fff5f5' : 'white', zIndex:1}}>
-                      {String(t.num_empleado).padStart(4,'0')}
+                      {(t.num_empleado == null ? 'NA' : String(t.num_empleado).padStart(4,'0'))}
                     </td>
                     <td style={{padding:'6px 8px', fontWeight:500, color: sinObra ? '#9ca3af' : '#111827'}}>
                       {t.nombre}
