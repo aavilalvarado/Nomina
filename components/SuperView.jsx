@@ -335,9 +335,9 @@ export default function SuperView({ perfil }) {
     const { data: todasO } = await supabase.from('obras').select('id,nombre').order('nombre')
     setTodosObras(todasO || [])
 
-    // Todos los trabajadores
+    // Todos los trabajadores ordenados por num_empleado
     const { data: todosT } = await supabase.from('trabajadores')
-      .select('*, obra:obras(nombre)').eq('activo', true).order('nombre')
+      .select('*, obra:obras(nombre)').eq('activo', true).order('num_empleado')
     setTodosTrabajadores(todosT || [])
 
     // Préstamos activos
