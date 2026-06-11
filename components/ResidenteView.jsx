@@ -296,9 +296,22 @@ export default function ResidenteView({ perfil }) {
                 const obraId = obraSeleccionada[t.id]
                 const nom = nominasPorObra[obraId]
                 const bloqueado = nom && nom.estado !== 'borrador'
-                const sinObra = !obraId || obraId === 'VACACIONES' || obraId === 'BAJA'
+                const sinObra = !obraId
                 const esVacaciones = obraId === 'VACACIONES'
                 const esBaja = obraId === 'BAJA'
+                const esIncidencia = esVacaciones || esBaja
+                // Fecha de incidencia para calcular días bloqueados
+                const fechaIncidencia = fechasIncidencia[t.id] ? new Date(fechasIncidencia[t.id]) : null
+                // Mapeo de días de la semana a fechas
+                const fechasSemana = {
+                  viernes: semana ? new Date(semana.fecha_inicio) : null,
+                  sabado: semana ? new Date(new Date(semana.fecha_inicio).getTime() + 86400000) : null,
+                  domingo: semana ? new Date(new Date(semana.fecha_inicio).getTime() + 2*86400000) : null,
+                  lunes: semana ? new Date(new Date(semana.fecha_inicio).getTime() + 3*86400000) : null,
+                  martes: semana ? new Date(new Date(semana.fecha_inicio).getTime() + 4*86400000) : null,
+                  miercoles: semana ? new Date(new Date(semana.fecha_inicio).getTime() + 5*86400000) : null,
+                  jueves: semana ? new Date(new Date(semana.fecha_inicio).getTime() + 6*86400000) : null,
+                }
 
                 return (
                   <tr key={t.id} style={{borderBottom:'1px solid #f9fafb', background: esBaja ? '#fef2f2' : esVacaciones ? '#f0f9ff' : sinObra ? '#fafafa' : tieneFalta ? '#fff5f5' : 'white'}}>
@@ -340,8 +353,8 @@ export default function ResidenteView({ perfil }) {
                         <select
                           value={d === 'sabado' ? (parseFloat(a[d]) === 0 ? 0 : 0.5) : (a[d] ?? 1.1)}
                           onChange={e => updateAsistencia(t.id, d, parseFloat(e.target.value))}
-                          disabled={bloqueado || sinObra}
-                          style={{fontSize:'11px', border:'1px solid', borderColor: parseFloat(a[d])===0 ? '#fca5a5' : '#e5e7eb', borderRadius:'4px', padding:'2px 1px', width:'46px', textAlign:'center', background: parseFloat(a[d])===0 ? '#fef2f2' : sinObra ? '#f9fafb' : 'white', color: parseFloat(a[d])===0 ? '#ef4444' : sinObra ? '#d1d5db' : '#374151'}}>
+                          disabled={bloqueado || sinObra || (esIncidencia && fechaIncidencia && fechasSemana[d] && fechasSemana[d] >= fechaIncidencia)}
+                          style={{fontSize:'11px', border:'1px solid', borderColor: parseFloat(a[d])===0 ? '#fca5a5' : '#e5e7eb', borderRadius:'4px', padding:'2px 1px', width:'46px', textAlign:'center', background: (esIncidencia && fechaIncidencia && fechasSemana[d] && fechasSemana[d] >= fechaIncidencia) ? '#f3f4f6' : parseFloat(a[d])===0 ? '#fef2f2' : sinObra ? '#f9fafb' : 'white', color: (esIncidencia && fechaIncidencia && fechasSemana[d] && fechasSemana[d] >= fechaIncidencia) ? '#9ca3af' : parseFloat(a[d])===0 ? '#ef4444' : sinObra ? '#d1d5db' : '#374151'}}>
                           {d === 'sabado' ? (
                             <>
                               <option value={0.5}>✓</option>
@@ -365,7 +378,7 @@ export default function ResidenteView({ perfil }) {
                         placeholder="0"
                         onChange={e => updateAsistencia(t.id, 'horas_extra', e.target.value)}
                         disabled={bloqueado || sinObra}
-                        style={{width:'50px', fontSize:'11px', border:'1px solid #e5e7eb', borderRadius:'4px', padding:'2px 4px', textAlign:'center', background: sinObra ? '#f9fafb' : 'white', color: sinObra ? '#d1d5db' : '#374151'}} />
+                        style={{width:'50px', fontSize:'11px', border:'1px solid #e5e7eb', borderRadius:'4px', padding:'2px 4px', textAlign:'center', background: (sinObra || esIncidencia) ? '#f9fafb' : 'white', color: (sinObra || esIncidencia) ? '#d1d5db' : '#374151'}} />
                     </td>
                   </tr>
                 )
