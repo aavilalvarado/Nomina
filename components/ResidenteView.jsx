@@ -67,7 +67,7 @@ export default function ResidenteView({ perfil }) {
 
     let q = supabase.from('trabajadores')
       .select('id, num_empleado, nombre, puesto, tiene_bono, obra_id')
-      .eq('activo', true).order('nombre', { ascending: true })
+      .eq('activo', true).order('num_empleado', { ascending: true, nullsFirst: false })
     if (oficinaId) q = q.neq('obra_id', oficinaId)
     const { data: todosT } = await q
 
