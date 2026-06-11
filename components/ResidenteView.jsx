@@ -99,7 +99,7 @@ export default function ResidenteView({ perfil }) {
     }
     ;(trab || []).forEach(t => {
       if (!asistInit[t.id]) asistInit[t.id] = {
-        viernes: 1.1, sabado: 1.1, domingo: 0,
+        viernes: 1.1, sabado: 0.5, domingo: 0,
         lunes: 1.1, martes: 1.1, miercoles: 1.1, jueves: 1.1,
         horas_extra: 0, prestamos: 0
       }
