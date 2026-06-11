@@ -337,13 +337,22 @@ export default function ResidenteView({ perfil }) {
                     </td>
                     {DIAS.map(d => (
                       <td key={d} style={{padding:'4px 2px', textAlign:'center'}}>
-                        <select value={a[d] ?? 1.1}
+                        <select
+                          value={d === 'sabado' ? (parseFloat(a[d]) === 0 ? 0 : 0.5) : (a[d] ?? 1.1)}
                           onChange={e => updateAsistencia(t.id, d, parseFloat(e.target.value))}
                           disabled={bloqueado || sinObra}
                           style={{fontSize:'11px', border:'1px solid', borderColor: parseFloat(a[d])===0 ? '#fca5a5' : '#e5e7eb', borderRadius:'4px', padding:'2px 1px', width:'46px', textAlign:'center', background: parseFloat(a[d])===0 ? '#fef2f2' : sinObra ? '#f9fafb' : 'white', color: parseFloat(a[d])===0 ? '#ef4444' : sinObra ? '#d1d5db' : '#374151'}}>
-                          <option value={1.1}>✓</option>
-                          <option value={0.5}>½</option>
-                          <option value={0}>✗</option>
+                          {d === 'sabado' ? (
+                            <>
+                              <option value={0.5}>✓</option>
+                              <option value={0}>✗</option>
+                            </>
+                          ) : (
+                            <>
+                              <option value={1.1}>✓</option>
+                              <option value={0}>✗</option>
+                            </>
+                          )}
                         </select>
                       </td>
                     ))}
