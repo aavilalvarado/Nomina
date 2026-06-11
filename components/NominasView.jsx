@@ -131,52 +131,27 @@ export default function NominasView({ perfil }) {
   }
 
   async function exportarFiniquitoExcel() {
-    if (!finiquito) return
-    const wb = XLSX.utils.book_new()
-    const fecha = new Date(finiquito.fecha_baja).toLocaleDateString('es-MX', { day:'2-digit', month:'long', year:'numeric' }).toUpperCase()
-
-    const data = [
-      ['TIJUANA, BAJA CALIFORNIA A:', fecha],
-      [],
-      ['YO:', finiquito.trabajador],
-      [],
-      ['DECLARO HABER PRESTADO MIS SERVICIOS PERSONALES A LA EMPRESA ESPACIOS Y EDIFICACIONES ESCALANTE,'],
-      ['CON DOMICILIO EN BLVD. DE LAS AMERICAS #3565-40, COLONIA 20 DE NOVIEMBRE, TIJUANA BAJA CALIFORNIA.'],
-      ['RECIBIENDO DE LA EMPRESA:'],
-      [],
-      ['LA CANTIDAD DE:', `$${Number(finiquito.total).toLocaleString('es-MX', {minimumFractionDigits:2})}`, `(MONTO EN MN)`],
-      [],
-      ['POR CONCEPTO DE FINIQUITO, CON MOTIVO DE LA TERMINACION LABORAL POR ASÍ CONVENIR'],
-      ['A MIS INTERESES CON FECHA DE:', fecha],
-      [],
-      ['S.D.I.', finiquito.sdi, '', 'VACACIONES EN CURSO', 'AGUINALDO'],
-      ['INGRESO', finiquito.fecha_ingreso],
-      ['BAJA', finiquito.fecha_baja, '', finiquito.vacaciones_dias, finiquito.aguinaldo_dias],
-      [],
-      ['ANTIGÜEDAD', finiquito.antiguedad_dias, 'DÍAS'],
-      [],
-      ['', '', '', 'DÍAS', 'IMPORTE'],
-      ['SUELDO', '', '', finiquito.dias_semana, `$${finiquito.importe_sueldo}`],
-      ['SÉPTIMO DÍA', '', '', finiquito.septimo_dias, `$${finiquito.importe_septimo}`],
-      ['AGUINALDO PROP', '', '', finiquito.aguinaldo_dias, `$${finiquito.importe_aguinaldo}`],
-      ['VACACIONES DISPONIBLES', '', '', finiquito.vacaciones_dias, `$${finiquito.importe_vacaciones}`],
-      ['PRIMA VACACIONAL', '', '', finiquito.prima_dias, `$${finiquito.importe_prima}`],
-      ['CREDITO INFONAVIT', '', '', '', `-$${finiquito.infonavit}`],
-      [],
-      ['ASÍ MISMO MANIFIESTO QUE HASTA EL MOMENTO NO SE ME ADEUDA CANTIDAD ALGUNA POR NINGÚN CONCEPTO'],
-      ['DERIVADO DE LA RELACIÓN LABORAL QUE SOSTUVE CON LA EMPRESA.'],
-      [],
-      ['', '', '', '', 'PERCEPCION', `$${finiquito.importe_sueldo}`],
-      ['', '', '', '', 'GRATIFICACION', `$${(parseFloat(finiquito.importe_septimo)+parseFloat(finiquito.importe_aguinaldo)+parseFloat(finiquito.importe_vacaciones)+parseFloat(finiquito.importe_prima)).toFixed(2)}`],
-      ['', '', '', '', 'TOTAL', `$${finiquito.total}`],
-      [],
-      ['', finiquito.trabajador, '', '', '', 'HUELLA'],
-    ]
-
-    const ws = XLSX.utils.aoa_to_sheet(data)
-    ws['!cols'] = [{wch:30},{wch:25},{wch:10},{wch:20},{wch:20}]
-    XLSX.utils.book_append_sheet(wb, ws, 'FINIQUITO')
-    XLSX.writeFile(wb, `Finiquito_${finiquito.trabajador.split(' ')[0]}_${finiquito.fecha_baja}.xlsx`)
+    if (!finiquito || !trabajadorSeleccionado) return
+    try {
+      const response = await fetch('/api/generar-finiquito', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trabajador_id: trabajadorSeleccionado.id,
+          fecha_baja: fechaBaja
+        })
+      })
+      if (!response.ok) throw new Error('Error al generar finiquito')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Finiquito_${finiquito.trabajador.replace(/ /g,'_')}_${fechaBaja}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert('Error al generar el finiquito: ' + err.message)
+    }
   }
 
   async function exportarExcel() {
