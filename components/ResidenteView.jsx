@@ -23,6 +23,7 @@ export default function ResidenteView({ perfil }) {
   const [msg, setMsg] = useState('')
   const [filtro, setFiltro] = useState('todos')
   const [fechasIncidencia, setFechasIncidencia] = useState({})
+  const [diasVacaciones, setDiasVacaciones] = useState({})
   const [cargando, setCargando] = useState(true)
   const [prestamosActivos, setPrestamosActivos] = useState({}) // trabajador_id -> true
 
@@ -125,6 +126,9 @@ export default function ResidenteView({ perfil }) {
   function updateObra(id, obraId) {
     setObraSeleccionada(prev => ({ ...prev, [id]: obraId }))
   }
+  function updateDiasVacaciones(id, dias) {
+    setDiasVacaciones(prev => ({ ...prev, [id]: dias }))
+  }
   function updateFecha(id, fecha) {
     setFechasIncidencia(prev => ({ ...prev, [id]: fecha }))
   }
@@ -151,8 +155,31 @@ export default function ResidenteView({ perfil }) {
           semana_id: semana.id,
           tipo: obraId.toLowerCase(),
           reportado_por: perfil.id,
-          fecha_inicio: fechasIncidencia[t.id] || null
+          fecha_inicio: fechasIncidencia[t.id] || null,
+          dias_vacaciones: obraId === 'VACACIONES' ? (parseInt(diasVacaciones[t.id]) || 0) : null
         }, { onConflict: 'trabajador_id,semana_id' })
+
+        // Si es vacaciones, descontar días del período activo
+        if (obraId === 'VACACIONES') {
+          const diasUsados = parseInt(diasVacaciones[t.id]) || 0
+          if (diasUsados > 0) {
+            const { data: periodos } = await supabase
+              .from('vacaciones')
+              .select('id, dias_disponibles, dias_tomados')
+              .eq('trabajador_id', t.id)
+              .eq('activo', true)
+              .order('fecha_otorgamiento', { ascending: true })
+              .limit(1)
+            if (periodos && periodos.length > 0) {
+              const p = periodos[0]
+              const nuevosDisponibles = Math.max(0, (p.dias_disponibles || 0) - diasUsados)
+              const nuevosTomados = (p.dias_tomados || 0) + diasUsados
+              await supabase.from('vacaciones')
+                .update({ dias_disponibles: nuevosDisponibles, dias_tomados: nuevosTomados })
+                .eq('id', p.id)
+            }
+          }
+        }
         continue
       }
       const nom = nominasPorObra[obraId]
@@ -345,6 +372,18 @@ export default function ResidenteView({ perfil }) {
                           <div style={{fontSize:'9px', color:'#9ca3af', marginTop:'1px'}}>
                             {esVacaciones ? 'Inicio de vacaciones' : 'Fecha de baja'}
                           </div>
+                          {esVacaciones && (
+                            <div style={{marginTop:'4px', display:'flex', alignItems:'center', gap:'4px'}}>
+                              <input type="number" min="1" max="30"
+                                value={diasVacaciones[t.id] || ''}
+                                onChange={e => updateDiasVacaciones(t.id, e.target.value)}
+                                disabled={bloqueado}
+                                placeholder="Días"
+                                style={{fontSize:'10px', border:'1px solid #bae6fd', borderRadius:'4px', padding:'2px 4px', width:'52px', color:'#0369a1', textAlign:'center'}}
+                              />
+                              <span style={{fontSize:'9px', color:'#9ca3af'}}>días a descontar</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </td>
