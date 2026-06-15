@@ -795,7 +795,6 @@ export default function SuperView({ perfil }) {
   const TABS = [
     { id:'nominas', label:'📋 Nóminas', badge: nominas.length },
     { id:'oficina', label:'🏢 Oficina', badge: null },
-    { id:'vacaciones', label:'🏖 Vacaciones', badge: vacaciones.length || null },
     { id:'bajas', label:'🚫 Bajas', badge: bajas.length || null },
     { id:'sin-obra', label:'👷 Sin obra', badge: trabajadoresSinObra.length || null },
     { id:'obras-inactivas', label:'📁 Obras inactivas', badge: obrasInactivas.length || null },
@@ -960,40 +959,6 @@ export default function SuperView({ perfil }) {
       )}
 
       {/* TAB: VACACIONES */}
-      {tab === 'vacaciones' && (
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-          <div className="p-3 border-b border-gray-100">
-            <span className="font-medium text-sm text-gray-900">Personal de vacaciones esta semana</span>
-          </div>
-          {vacaciones.length === 0 ? (
-            <div className="text-center py-10 text-gray-400 text-sm">No hay personal de vacaciones esta semana</div>
-          ) : (
-            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
-              <thead>
-                <tr style={{background:'#f0f9ff',borderBottom:'1px solid #e0f2fe'}}>
-                  <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>#</th>
-                  <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>Trabajador</th>
-                  <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>Puesto</th>
-                  <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>Desde</th>
-                  <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>Reportado por</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vacaciones.filter(i => i && i.trabajador).map(i => (
-                  <tr key={i.id} style={{borderBottom:'1px solid #f0f9ff'}}>
-                    <td style={{padding:'8px 12px',color:'#9ca3af'}}>{String(i.trabajador?.num_empleado||'').padStart(4,'0')}</td>
-                    <td style={{padding:'8px 12px',fontWeight:500}}>{i.trabajador?.nombre}</td>
-                    <td style={{padding:'8px 12px',color:'#6b7280',fontSize:'12px'}}>{i.trabajador?.puesto}</td>
-                    <td style={{padding:'8px 12px',color:'#0369a1'}}>{i.fecha_inicio || '—'}</td>
-                    <td style={{padding:'8px 12px',color:'#6b7280'}}>{i.reportado?.nombre}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
       {/* TAB: BAJAS */}
       {tab === 'bajas' && (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
