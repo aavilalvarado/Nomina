@@ -691,6 +691,7 @@ export default function SuperView({ perfil }) {
     const { data: vacs } = await supabase
       .from('vacaciones')
       .select('*, trabajador:trabajadores(num_empleado, nombre, puesto, fecha_ingreso, obra:obras(nombre))')
+      .eq('activo', true)
       .order('fecha_vencimiento', { ascending: true })
     setVacacionesData(vacs || [])
 
