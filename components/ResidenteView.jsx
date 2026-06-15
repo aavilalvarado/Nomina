@@ -281,16 +281,25 @@ export default function ResidenteView({ perfil }) {
           {msg && <span className="text-green-600 text-xs font-medium">{msg}</span>}
           {bajasPendientes.length > 0 && (
             <button
-              onClick={() => {
+              onClick={async () => {
                 const obraNames = obrasResidente.map(o => o.nombre).join(', ')
-                const fecha = new Date().toLocaleDateString('es-MX')
-                const lista = bajasPendientes.map(b => 
-                  `• ${b.nombre} (fecha baja: ${b.fecha})`
-                ).join('\n')
-                const texto = `🚨 *BAJA REGISTRADA*\n\nFavor de verificar si cumple con todos los requisitos para su baja:\n\n${lista}\n\n📋 Obra: ${obraNames}\n👷 Residente: ${perfil.nombre}\n📅 Fecha: ${fecha}`
-                // Primero copia el mensaje al clipboard, luego abre el grupo
-                navigator.clipboard.writeText(texto).catch(() => {})
-                window.open('https://chat.whatsapp.com/GM5qrH7FfW35A5oiyGCRyi', '_blank')
+                try {
+                  await Promise.all(bajasPendientes.map(b =>
+                    fetch('/api/notificar-baja', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        trabajador: b.nombre,
+                        fecha: b.fecha,
+                        obra: obraNames,
+                        residente: perfil.nombre || perfil.email || 'Residente'
+                      })
+                    })
+                  ))
+                  alert('✅ Notificación enviada por WhatsApp al Super, Admin y Aux Admin.')
+                } catch (e) {
+                  alert('Error al enviar notificación: ' + e.message)
+                }
                 setBajasPendientes([])
               }}
               className="px-3 py-1.5 text-xs bg-green-500 text-white rounded-lg hover:bg-green-600 animate-pulse">
