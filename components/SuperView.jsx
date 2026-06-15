@@ -504,10 +504,11 @@ function EstadoVacaciones({ supabase, semanaActual }) {
     const activos = (vacs || []).filter(v => new Date(v.fecha_vencimiento) >= hoy)
 
     // Pueden tomar: tienen días disponibles
-    setPuedenTomar(activos.filter(v => (v.dias_disponibles - v.dias_tomados) > 0))
+    const sorted = (arr) => [...arr].sort((a,b) => (a.trabajador?.num_empleado ?? 9999) - (b.trabajador?.num_empleado ?? 9999))
+    setPuedenTomar(sorted(activos.filter(v => (v.dias_disponibles - v.dias_tomados) > 0)))
 
     // Ya tomaron: tienen días tomados pero aún tienen período activo
-    setYaTomaron(activos.filter(v => v.dias_tomados > 0))
+    setYaTomaron(sorted(activos.filter(v => v.dias_tomados > 0)))
 
     setCargando(false)
   }
