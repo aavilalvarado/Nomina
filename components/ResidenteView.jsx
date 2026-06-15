@@ -136,9 +136,10 @@ export default function ResidenteView({ perfil }) {
 
   async function getNominaId(obraId) {
     if (nominasPorObra[obraId]) return nominasPorObra[obraId].id
-    const { data } = await supabase.from('nominas_obra')
+    const { data, error } = await supabase.from('nominas_obra')
       .insert({ semana_id: semana.id, obra_id: obraId, residente_id: perfil.id })
       .select().single()
+    if (error || !data) { console.error('Error creando nomina:', error); return null }
     setNominasPorObra(prev => ({ ...prev, [obraId]: data }))
     return data.id
   }
@@ -191,6 +192,7 @@ export default function ResidenteView({ perfil }) {
       const nom = nominasPorObra[obraId]
       if (nom && nom.estado !== 'borrador') continue
       const nominaId = await getNominaId(obraId)
+      if (!nominaId) continue
       const a = asistencias[t.id] || {}
       const dias = calcularDias(a)
       await supabase.from('asistencias').upsert({
