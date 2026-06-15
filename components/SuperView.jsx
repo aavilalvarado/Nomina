@@ -471,6 +471,163 @@ function VacacionesControl({ vacaciones, supabase, onUpdate }) {
   )
 }
 
+
+function EstadoVacaciones({ supabase, semanaActual }) {
+  const [deVacaciones, setDeVacaciones] = useState([])
+  const [puedenTomar, setPuedenTomar] = useState([])
+  const [yaTomaron, setYaTomaron] = useState([])
+  const [cargando, setCargando] = useState(true)
+
+  useEffect(() => { cargar() }, [semanaActual])
+
+  async function cargar() {
+    setCargando(true)
+
+    // 1. De vacaciones esta semana (incidencias tipo vacaciones de semana actual)
+    if (semanaActual) {
+      const { data: inc } = await supabase
+        .from('incidencias')
+        .select('*, trabajador:trabajadores(num_empleado, nombre, puesto, obra:obras(nombre))')
+        .eq('semana_id', semanaActual.id)
+        .eq('tipo', 'vacaciones')
+      setDeVacaciones(inc || [])
+    }
+
+    // 2. Todos los períodos activos
+    const { data: vacs } = await supabase
+      .from('vacaciones')
+      .select('*, trabajador:trabajadores(num_empleado, nombre, puesto, obra:obras(nombre))')
+      .eq('activo', true)
+      .order('fecha_vencimiento', { ascending: true })
+
+    const hoy = new Date()
+    const activos = (vacs || []).filter(v => new Date(v.fecha_vencimiento) >= hoy)
+
+    // Pueden tomar: tienen días disponibles
+    setPuedenTomar(activos.filter(v => (v.dias_disponibles - v.dias_tomados) > 0))
+
+    // Ya tomaron: tienen días tomados pero aún tienen período activo
+    setYaTomaron(activos.filter(v => v.dias_tomados > 0))
+
+    setCargando(false)
+  }
+
+  const SeccionHeader = ({ color, emoji, titulo, count }) => (
+    <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px', marginTop:'20px'}}>
+      <div style={{width:'4px', height:'20px', background:color, borderRadius:'2px'}} />
+      <span style={{fontWeight:600, color:'#111827', fontSize:'14px'}}>{emoji} {titulo}</span>
+      <span style={{fontSize:'12px', color:'#9ca3af', background:'#f3f4f6', borderRadius:'10px', padding:'1px 8px'}}>{count}</span>
+    </div>
+  )
+
+  const TablaTrabajadores = ({ datos, cols, renderRow }) => (
+    <div style={{background:'white', borderRadius:'12px', border:'1px solid #f3f4f6', overflow:'hidden', marginBottom:'4px'}}>
+      <table style={{width:'100%', borderCollapse:'collapse', fontSize:'12px'}}>
+        <thead>
+          <tr style={{background:'#f9fafb', borderBottom:'1px solid #f3f4f6'}}>
+            {cols.map(c => (
+              <th key={c} style={{textAlign:'left', padding:'8px 12px', color:'#9ca3af', fontWeight:500}}>{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {datos.length === 0
+            ? <tr><td colSpan={cols.length} style={{padding:'20px', textAlign:'center', color:'#9ca3af'}}>Sin registros</td></tr>
+            : datos.map((d, i) => renderRow(d, i))
+          }
+        </tbody>
+      </table>
+    </div>
+  )
+
+  if (cargando) return <div style={{padding:'40px', textAlign:'center', color:'#9ca3af'}}>Cargando...</div>
+
+  return (
+    <div>
+      {/* DE VACACIONES AHORA */}
+      <SeccionHeader color="#0ea5e9" emoji="🏖" titulo="De vacaciones esta semana" count={deVacaciones.length} />
+      <TablaTrabajadores
+        datos={deVacaciones}
+        cols={['#', 'Trabajador', 'Puesto', 'Obra', 'Inicio']}
+        renderRow={(inc, i) => (
+          <tr key={inc.id} style={{borderBottom:'1px solid #f9fafb', background: i%2===0?'white':'#f0f9ff'}}>
+            <td style={{padding:'8px 12px', color:'#9ca3af', fontFamily:'monospace'}}>
+              {inc.trabajador?.num_empleado == null ? 'NA' : String(inc.trabajador.num_empleado).padStart(4,'0')}
+            </td>
+            <td style={{padding:'8px 12px', fontWeight:500}}>{inc.trabajador?.nombre}</td>
+            <td style={{padding:'8px 12px', color:'#6b7280'}}>{inc.trabajador?.puesto}</td>
+            <td style={{padding:'8px 12px', color:'#6b7280'}}>{inc.trabajador?.obra?.nombre || '—'}</td>
+            <td style={{padding:'8px 12px', color:'#0369a1'}}>{inc.fecha_inicio || '—'}</td>
+          </tr>
+        )}
+      />
+
+      {/* PUEDEN TOMAR */}
+      <SeccionHeader color="#16a34a" emoji="✅" titulo="Pueden tomar vacaciones" count={puedenTomar.length} />
+      <TablaTrabajadores
+        datos={puedenTomar}
+        cols={['#', 'Trabajador', 'Puesto', 'Obra', 'Disponibles', 'Tomadas', 'Vence']}
+        renderRow={(v, i) => {
+          const disp = v.dias_disponibles - v.dias_tomados
+          const venc = new Date(v.fecha_vencimiento)
+          const dias = Math.ceil((venc - new Date()) / (1000*60*60*24))
+          const proxima = dias <= 30
+          return (
+            <tr key={v.id} style={{borderBottom:'1px solid #f9fafb', background: i%2===0?'white':'#f0fdf4'}}>
+              <td style={{padding:'8px 12px', color:'#9ca3af', fontFamily:'monospace'}}>
+                {v.trabajador?.num_empleado == null ? 'NA' : String(v.trabajador.num_empleado).padStart(4,'0')}
+              </td>
+              <td style={{padding:'8px 12px', fontWeight:500}}>{v.trabajador?.nombre}</td>
+              <td style={{padding:'8px 12px', color:'#6b7280'}}>{v.trabajador?.puesto}</td>
+              <td style={{padding:'8px 12px', color:'#6b7280'}}>{v.trabajador?.obra?.nombre || '—'}</td>
+              <td style={{padding:'8px 12px', textAlign:'center'}}>
+                <span style={{fontWeight:700, color:'#7c3aed', fontSize:'13px'}}>{disp}</span>
+                <span style={{color:'#9ca3af', fontSize:'10px'}}> días</span>
+              </td>
+              <td style={{padding:'8px 12px', textAlign:'center', color:'#6b7280'}}>{v.dias_tomados}</td>
+              <td style={{padding:'8px 12px', fontSize:'11px', color: proxima ? '#d97706' : '#6b7280'}}>
+                {v.fecha_vencimiento}
+                <div style={{fontSize:'10px', color: proxima ? '#f59e0b' : '#9ca3af'}}>
+                  {proxima ? `⚠ ${dias} días` : `${dias} días`}
+                </div>
+              </td>
+            </tr>
+          )
+        }}
+      />
+
+      {/* YA TOMARON */}
+      <SeccionHeader color="#6b7280" emoji="📋" titulo="Ya tomaron vacaciones" count={yaTomaron.length} />
+      <TablaTrabajadores
+        datos={yaTomaron}
+        cols={['#', 'Trabajador', 'Puesto', 'Obra', 'Otorgadas', 'Tomadas', 'Restantes']}
+        renderRow={(v, i) => {
+          const disp = v.dias_disponibles - v.dias_tomados
+          const pct = Math.round((v.dias_tomados / v.dias_disponibles) * 100)
+          return (
+            <tr key={v.id} style={{borderBottom:'1px solid #f9fafb', background: i%2===0?'white':'#fafafa'}}>
+              <td style={{padding:'8px 12px', color:'#9ca3af', fontFamily:'monospace'}}>
+                {v.trabajador?.num_empleado == null ? 'NA' : String(v.trabajador.num_empleado).padStart(4,'0')}
+              </td>
+              <td style={{padding:'8px 12px', fontWeight:500}}>{v.trabajador?.nombre}</td>
+              <td style={{padding:'8px 12px', color:'#6b7280'}}>{v.trabajador?.puesto}</td>
+              <td style={{padding:'8px 12px', color:'#6b7280'}}>{v.trabajador?.obra?.nombre || '—'}</td>
+              <td style={{padding:'8px 12px', textAlign:'center', color:'#374151', fontWeight:600}}>{v.dias_disponibles}</td>
+              <td style={{padding:'8px 12px', textAlign:'center', color:'#374151'}}>{v.dias_tomados}</td>
+              <td style={{padding:'8px 12px', textAlign:'center'}}>
+                <span style={{fontWeight:600, color: disp > 0 ? '#7c3aed' : '#9ca3af'}}>{disp}</span>
+                <div style={{height:'4px', background:'#e5e7eb', borderRadius:'2px', marginTop:'3px', width:'50px', margin:'3px auto 0'}}>
+                  <div style={{height:'4px', background:'#8b5cf6', borderRadius:'2px', width: pct + '%'}} />
+                </div>
+              </td>
+            </tr>
+          )
+        }}
+      />
+    </div>
+  )
+}
+
 export default function SuperView({ perfil }) {
   const [semanas, setSemanas] = useState([])
   const [semanaActual, setSemanaActual] = useState(null)
@@ -795,6 +952,7 @@ export default function SuperView({ perfil }) {
   const TABS = [
     { id:'nominas', label:'📋 Nóminas', badge: nominas.length },
     { id:'oficina', label:'🏢 Oficina', badge: null },
+    { id:'vacaciones', label:'🏖 Vacaciones', badge: vacaciones.length || null },
     { id:'bajas', label:'🚫 Bajas', badge: bajas.length || null },
     { id:'sin-obra', label:'👷 Sin obra', badge: trabajadoresSinObra.length || null },
     { id:'obras-inactivas', label:'📁 Obras inactivas', badge: obrasInactivas.length || null },
@@ -802,6 +960,7 @@ export default function SuperView({ perfil }) {
     { id:'personal', label:'👷 Personal', badge: null },
     { id:'prestamos', label:'💰 Préstamos', badge: null },
     { id:'vac-control', label:'🌴 Vacaciones', badge: null },
+    { id:'estado-vacaciones', label:'📋 Estado Vacaciones', badge: null },
   ]
 
   return (
@@ -959,6 +1118,40 @@ export default function SuperView({ perfil }) {
       )}
 
       {/* TAB: VACACIONES */}
+      {tab === 'vacaciones' && (
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="p-3 border-b border-gray-100">
+            <span className="font-medium text-sm text-gray-900">Personal de vacaciones esta semana</span>
+          </div>
+          {vacaciones.length === 0 ? (
+            <div className="text-center py-10 text-gray-400 text-sm">No hay personal de vacaciones esta semana</div>
+          ) : (
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
+              <thead>
+                <tr style={{background:'#f0f9ff',borderBottom:'1px solid #e0f2fe'}}>
+                  <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>#</th>
+                  <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>Trabajador</th>
+                  <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>Puesto</th>
+                  <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>Desde</th>
+                  <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>Reportado por</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vacaciones.filter(i => i && i.trabajador).map(i => (
+                  <tr key={i.id} style={{borderBottom:'1px solid #f0f9ff'}}>
+                    <td style={{padding:'8px 12px',color:'#9ca3af'}}>{String(i.trabajador?.num_empleado||'').padStart(4,'0')}</td>
+                    <td style={{padding:'8px 12px',fontWeight:500}}>{i.trabajador?.nombre}</td>
+                    <td style={{padding:'8px 12px',color:'#6b7280',fontSize:'12px'}}>{i.trabajador?.puesto}</td>
+                    <td style={{padding:'8px 12px',color:'#0369a1'}}>{i.fecha_inicio || '—'}</td>
+                    <td style={{padding:'8px 12px',color:'#6b7280'}}>{i.reportado?.nombre}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
       {/* TAB: BAJAS */}
       {tab === 'bajas' && (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
@@ -1424,6 +1617,10 @@ export default function SuperView({ perfil }) {
             setVacacionesData(data || [])
           }}
         />
+      )}
+
+      {tab === 'estado-vacaciones' && (
+        <EstadoVacaciones supabase={supabase} semanaActual={semanaActual} />
       )}
 
       {/* TAB: OBRAS INACTIVAS */}
