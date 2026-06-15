@@ -26,6 +26,7 @@ export default function ResidenteView({ perfil }) {
   const [diasVacaciones, setDiasVacaciones] = useState({})
   const [cargando, setCargando] = useState(true)
   const [prestamosActivos, setPrestamosActivos] = useState({}) // trabajador_id -> true
+  const [bajasPendientes, setBajasPendientes] = useState([]) // trabajadores dados de baja para notificar
 
   useEffect(() => { cargarDatos() }, [])
 
@@ -145,6 +146,7 @@ export default function ResidenteView({ perfil }) {
   async function guardar() {
     if (!semana) return
     setGuardando(true); setMsg('')
+    const bajas = []
     for (const t of trabajadores) {
       const obraId = obraSeleccionada[t.id]
       if (!obraId) continue
@@ -158,6 +160,10 @@ export default function ResidenteView({ perfil }) {
           fecha_inicio: fechasIncidencia[t.id] || null,
           dias_vacaciones: obraId === 'VACACIONES' ? (parseInt(diasVacaciones[t.id]) || 0) : null
         }, { onConflict: 'trabajador_id,semana_id' })
+        // Registrar baja para notificación WhatsApp
+        if (obraId === 'BAJA') {
+          bajas.push({ nombre: t.nombre, fecha: fechasIncidencia[t.id] || new Date().toISOString().split('T')[0] })
+        }
 
         // Si es vacaciones, descontar días del período activo
         if (obraId === 'VACACIONES') {
@@ -200,6 +206,7 @@ export default function ResidenteView({ perfil }) {
       }, { onConflict: 'nomina_obra_id,trabajador_id' })
     }
     setGuardando(false); setMsg('✓ Guardado')
+    if (bajas.length > 0) setBajasPendientes(bajas)
     setTimeout(() => setMsg(''), 2000)
   }
 
@@ -270,6 +277,24 @@ export default function ResidenteView({ perfil }) {
         </div>
         <div className="flex items-center gap-2">
           {msg && <span className="text-green-600 text-xs font-medium">{msg}</span>}
+          {bajasPendientes.length > 0 && (
+            <button
+              onClick={() => {
+                const obraNames = obrasResidente.map(o => o.nombre).join(', ')
+                const fecha = new Date().toLocaleDateString('es-MX')
+                const lista = bajasPendientes.map(b => 
+                  `• ${b.nombre} (fecha baja: ${b.fecha})`
+                ).join('\n')
+                const texto = `🚨 *BAJA REGISTRADA*\n\nFavor de verificar si cumple con todos los requisitos para su baja:\n\n${lista}\n\n📋 Obra: ${obraNames}\n👷 Residente: ${perfil.nombre}\n📅 Fecha: ${fecha}`
+                // Primero copia el mensaje al clipboard, luego abre el grupo
+                navigator.clipboard.writeText(texto).catch(() => {})
+                window.open('https://chat.whatsapp.com/GM5qrH7FfW35A5oiyGCRyi', '_blank')
+                setBajasPendientes([])
+              }}
+              className="px-3 py-1.5 text-xs bg-green-500 text-white rounded-lg hover:bg-green-600 animate-pulse">
+              📲 Notificar baja por WhatsApp
+            </button>
+          )}
           {!todasBloqueadas && <>
             <button onClick={guardar} disabled={guardando}
               className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">
