@@ -220,6 +220,19 @@ export default function ResidenteView({ perfil }) {
         await supabase.from('nominas_obra')
           .update({ estado: 'enviada', enviada_at: new Date().toISOString() })
           .eq('id', nom.id)
+        // Notificar a Kathe por WhatsApp
+        try {
+          await fetch('/api/notificar-whatsapp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tipo: 'enviada',
+              obra: o.nombre,
+              residente: perfil.nombre || perfil.email || 'Residente',
+              semana: `${semana.semana_num} (${semana.fecha_inicio} al ${semana.fecha_fin})`
+            })
+          })
+        } catch (e) { console.error('WhatsApp notify error:', e) }
       }
     }
     await cargarDatos(); setEnviando(false)
