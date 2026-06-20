@@ -4,6 +4,30 @@ import { supabase } from '../lib/supabase'
 const DIAS = ['viernes','sabado','domingo','lunes','martes','miercoles','jueves']
 const DIAS_LABEL = ['Vie','Sáb','Dom','Lun','Mar','Mié','Jue']
 
+// Día de hoy como columna de la semana (viernes=0 ... jueves=6)
+function getDiaColumnaHoy() {
+  const hoy = new Date()
+  const js = hoy.getDay() // 0=dom,1=lun,...,6=sáb
+  const mapa = { 5:'viernes', 6:'sabado', 0:'domingo', 1:'lunes', 2:'martes', 3:'miercoles', 4:'jueves' }
+  return mapa[js] || null
+}
+
+function getFechaHoy() {
+  return new Date().toISOString().split('T')[0]
+}
+
+// Retorna la fecha ISO de cada columna de la semana dado fecha_inicio (viernes)
+function getFechasDeSemana(fechaInicio) {
+  const base = new Date(fechaInicio)
+  const fechas = {}
+  DIAS.forEach((d, i) => {
+    const f = new Date(base)
+    f.setDate(base.getDate() + i)
+    fechas[d] = f.toISOString().split('T')[0]
+  })
+  return fechas
+}
+
 function calcularDias(asistencia) {
   return Math.round(DIAS.reduce((sum, d) => {
     const v = parseFloat(asistencia[d])
@@ -11,11 +35,23 @@ function calcularDias(asistencia) {
   }, 0) * 10) / 10
 }
 
+const LISTA_SILVANA = [
+  'MUÑIZ RIOS JUAN CARLOS','BENITEZ CARRILLO BUENA VENTURA','RAMIREZ CALDERON RAUL',
+  'LOPEZ PEREZ HUMBERTO','GRANADOS MARIN LUIS ENRIQUE','LOEZA CABRERA EMANUEL OSIEL',
+  'DIAZ GARCIA JOEL ESAU','VICARIO MANRIQUEZ JUAN MANUEL','HERNANDEZ CRUZ MIGUEL ANGEL',
+  'NAJERA RAMIREZ ARTURO','SANDOVAL DIAZ LUIS ARMANDO','JAVALERA MEDINA ADAN FERNANDO',
+  'CABRERA BECERRA GONZALO','FARRERA ALVARADO LUIS ENRIQUE','MEDINA VALENCIA JOSE LUIS',
+  'GUERRERO ORTEGA SANTOS','HERRERA HERNANDEZ MAURICIO MAGDALENO','DIAZ GARCIA JOSUE JACOB',
+  'VELAZQUEZ JAVALERA JUAN ANTONIO','LEMUS GARCIA ANASTACIO','RAMIREZ FLORES LEONEL',
+  'RAMIREZ MARTINEZ ALAN DANIEL','MENDOZA ALFONSO CARLOS ENRIQUE',
+  'ESPINOZA CASILLAS JONATHAN VALENTIN','LOPEZ CASTILLO CARLOS MAURICIO',
+]
+
 export default function ResidenteView({ perfil }) {
   const [obrasResidente, setObrasResidente] = useState([])
   const [semana, setSemana] = useState(null)
   const [trabajadores, setTrabajadores] = useState([])
-  const [asistencias, setAsistencias] = useState({})
+  const [asistencias, setAsistencias] = useState({})         // { [trab_id]: { viernes, sabado, ... } }
   const [obraSeleccionada, setObraSeleccionada] = useState({})
   const [nominasPorObra, setNominasPorObra] = useState({})
   const [guardando, setGuardando] = useState(false)
@@ -25,8 +61,13 @@ export default function ResidenteView({ perfil }) {
   const [fechasIncidencia, setFechasIncidencia] = useState({})
   const [diasVacaciones, setDiasVacaciones] = useState({})
   const [cargando, setCargando] = useState(true)
-  const [prestamosActivos, setPrestamosActivos] = useState({}) // trabajador_id -> true
-  const [bajasPendientes, setBajasPendientes] = useState([]) // trabajadores dados de baja para notificar
+  const [prestamosActivos, setPrestamosActivos] = useState({})
+  const [bajasPendientes, setBajasPendientes] = useState([])
+  const [alertasFaltas, setAlertasFaltas] = useState({})     // { [trab_id]: totalFaltas }
+  const [fechasSemana, setFechasSemana] = useState({})       // { viernes: 'YYYY-MM-DD', ... }
+
+  const diaColumnaHoy = getDiaColumnaHoy()
+  const fechaHoy = getFechaHoy()
 
   useEffect(() => { cargarDatos() }, [])
 
@@ -42,28 +83,24 @@ export default function ResidenteView({ perfil }) {
     const { data: semanas } = await supabase
       .from('semanas').select('*').eq('estado', 'abierta')
       .order('fecha_inicio', { ascending: false }).limit(1)
-    if (!semanas || semanas.length === 0) return
+    if (!semanas || semanas.length === 0) { setCargando(false); return }
     const sem = semanas[0]
     setSemana(sem)
+
+    const fechas = getFechasDeSemana(sem.fecha_inicio)
+    setFechasSemana(fechas)
 
     const { data: todasObras } = await supabase.from('obras').select('id,nombre')
     const oficinaId = (todasObras || []).find(o => o.nombre === 'OFICINA')?.id
 
-    // Obtener trabajadores ya asignados por OTROS residentes esta semana
+    // Trabajadores ya asignados por otros residentes esta semana
     const { data: todasNominas } = await supabase
-      .from('nominas_obra')
-      .select('id, obra_id')
-      .eq('semana_id', sem.id)
-
-    // Solo nóminas de OTROS residentes (no las propias)
+      .from('nominas_obra').select('id, obra_id').eq('semana_id', sem.id)
     const nominasOtros = (todasNominas || []).filter(n => !obras.map(o => o.id).includes(n.obra_id))
-
     let trabajadoresYaAsignados = []
     for (const nom of nominasOtros) {
       const { data: asist } = await supabase
-        .from('asistencias')
-        .select('trabajador_id')
-        .eq('nomina_obra_id', nom.id)
+        .from('asistencias').select('trabajador_id').eq('nomina_obra_id', nom.id)
       trabajadoresYaAsignados = [...trabajadoresYaAsignados, ...(asist || []).map(a => a.trabajador_id)]
     }
 
@@ -72,8 +109,6 @@ export default function ResidenteView({ perfil }) {
       .eq('activo', true).order('num_empleado', { ascending: true, nullsFirst: false })
     if (oficinaId) q = q.neq('obra_id', oficinaId)
     const { data: todosT } = await q
-
-    // Filtrar los ya asignados por otros residentes
     const trab = (todosT || []).filter(t => !trabajadoresYaAsignados.includes(t.id))
     setTrabajadores(trab)
 
@@ -81,12 +116,30 @@ export default function ResidenteView({ perfil }) {
     let nominasMap = {}
     if (obraIds.length > 0) {
       const { data: nominas } = await supabase
-        .from('nominas_obra').select('*')
-        .eq('semana_id', sem.id).in('obra_id', obraIds)
+        .from('nominas_obra').select('*').eq('semana_id', sem.id).in('obra_id', obraIds)
       ;(nominas || []).forEach(n => { nominasMap[n.obra_id] = n })
     }
     setNominasPorObra(nominasMap)
 
+    // Cargar asistencia_diaria de esta semana para estas obras
+    const trabIds = (trab || []).map(t => t.id)
+    let diariasMap = {}  // { [trab_id]: { viernes: valor, ... } }
+    if (trabIds.length > 0) {
+      const { data: diarias } = await supabase
+        .from('asistencia_diaria')
+        .select('trabajador_id, fecha, valor')
+        .in('trabajador_id', trabIds)
+        .gte('fecha', sem.fecha_inicio)
+        .lte('fecha', sem.fecha_fin)
+      ;(diarias || []).forEach(d => {
+        if (!diariasMap[d.trabajador_id]) diariasMap[d.trabajador_id] = {}
+        // Mapear fecha → columna
+        const col = Object.entries(fechas).find(([, f]) => f === d.fecha)?.[0]
+        if (col) diariasMap[d.trabajador_id][col] = parseFloat(d.valor)
+      })
+    }
+
+    // Cargar obra asignada desde asistencias (nómina ya guardada)
     const obraSelecInit = {}
     const asistInit = {}
     for (const obraId of obraIds) {
@@ -99,24 +152,27 @@ export default function ResidenteView({ perfil }) {
         asistInit[a.trabajador_id] = a
       })
     }
-    const LISTA_SILVANA = [
-      'MUÑIZ RIOS JUAN CARLOS','BENITEZ CARRILLO BUENA VENTURA','RAMIREZ CALDERON RAUL',
-      'LOPEZ PEREZ HUMBERTO','GRANADOS MARIN LUIS ENRIQUE','LOEZA CABRERA EMANUEL OSIEL',
-      'DIAZ GARCIA JOEL ESAU','VICARIO MANRIQUEZ JUAN MANUEL','HERNANDEZ CRUZ MIGUEL ANGEL',
-      'NAJERA RAMIREZ ARTURO','SANDOVAL DIAZ LUIS ARMANDO','JAVALERA MEDINA ADAN FERNANDO',
-      'CABRERA BECERRA GONZALO','FARRERA ALVARADO LUIS ENRIQUE','MEDINA VALENCIA JOSE LUIS',
-      'GUERRERO ORTEGA SANTOS','HERRERA HERNANDEZ MAURICIO MAGDALENO','DIAZ GARCIA JOSUE JACOB',
-      'VELAZQUEZ JAVALERA JUAN ANTONIO','LEMUS GARCIA ANASTACIO','RAMIREZ FLORES LEONEL',
-      'RAMIREZ MARTINEZ ALAN DANIEL','MENDOZA ALFONSO CARLOS ENRIQUE',
-      'ESPINOZA CASILLAS JONATHAN VALENTIN','LOPEZ CASTILLO CARLOS MAURICIO',
-    ]
-    const silvanaId = obras.find(o => o.nombre === 'SILVANA')?.id
 
+    const silvanaId = obras.find(o => o.nombre === 'SILVANA')?.id
     ;(trab || []).forEach(t => {
-      if (!asistInit[t.id]) asistInit[t.id] = {
-        viernes: 1.1, sabado: 0.5, domingo: 0,
-        lunes: 1.1, martes: 1.1, miercoles: 1.1, jueves: 1.1,
-        horas_extra: 0, prestamos: 0
+      // Valores base: usar diaria si existe, si no defaults
+      const base = diariasMap[t.id] || {}
+      if (!asistInit[t.id]) {
+        asistInit[t.id] = {
+          viernes:   base.viernes   ?? 1.1,
+          sabado:    base.sabado    ?? 0.5,
+          domingo:   base.domingo   ?? 0,
+          lunes:     base.lunes     ?? 1.1,
+          martes:    base.martes    ?? 1.1,
+          miercoles: base.miercoles ?? 1.1,
+          jueves:    base.jueves    ?? 1.1,
+          horas_extra: 0, prestamos: 0
+        }
+      } else {
+        // Mezclar: si hay captura diaria más reciente, prevalece sobre la nómina guardada
+        DIAS.forEach(d => {
+          if (base[d] !== undefined) asistInit[t.id][d] = base[d]
+        })
       }
       if (!obraSelecInit[t.id]) {
         const nombreNorm = t.nombre.trim().toUpperCase().replace(/\s+/g, ' ')
@@ -130,11 +186,26 @@ export default function ResidenteView({ perfil }) {
     })
     setAsistencias(asistInit)
     setObraSeleccionada(obraSelecInit)
-    // Cargar préstamos activos
+
+    // Cargar conteo de faltas en los últimos 30 días por trabajador
+    if (trabIds.length > 0) {
+      const hace30 = new Date()
+      hace30.setDate(hace30.getDate() - 30)
+      const limite = hace30.toISOString().split('T')[0]
+      const { data: faltas } = await supabase
+        .from('asistencia_diaria')
+        .select('trabajador_id')
+        .in('trabajador_id', trabIds)
+        .eq('valor', 0)
+        .gte('fecha', limite)
+      const conteo = {}
+      ;(faltas || []).forEach(f => { conteo[f.trabajador_id] = (conteo[f.trabajador_id] || 0) + 1 })
+      setAlertasFaltas(conteo)
+    }
+
+    // Préstamos activos
     const { data: prests } = await supabase
-      .from('prestamos')
-      .select('trabajador_id')
-      .eq('activo', true)
+      .from('prestamos').select('trabajador_id').eq('activo', true)
     const prestMap = {}
     ;(prests || []).forEach(p => { prestMap[p.trabajador_id] = true })
     setPrestamosActivos(prestMap)
@@ -145,15 +216,9 @@ export default function ResidenteView({ perfil }) {
   function updateAsistencia(id, campo, valor) {
     setAsistencias(prev => ({ ...prev, [id]: { ...prev[id], [campo]: valor } }))
   }
-  function updateObra(id, obraId) {
-    setObraSeleccionada(prev => ({ ...prev, [id]: obraId }))
-  }
-  function updateDiasVacaciones(id, dias) {
-    setDiasVacaciones(prev => ({ ...prev, [id]: dias }))
-  }
-  function updateFecha(id, fecha) {
-    setFechasIncidencia(prev => ({ ...prev, [id]: fecha }))
-  }
+  function updateObra(id, obraId) { setObraSeleccionada(prev => ({ ...prev, [id]: obraId })) }
+  function updateDiasVacaciones(id, dias) { setDiasVacaciones(prev => ({ ...prev, [id]: dias })) }
+  function updateFecha(id, fecha) { setFechasIncidencia(prev => ({ ...prev, [id]: fecha })) }
 
   async function getNominaId(obraId) {
     if (nominasPorObra[obraId]) return nominasPorObra[obraId].id
@@ -165,90 +230,91 @@ export default function ResidenteView({ perfil }) {
     return data.id
   }
 
-  async function guardar() {
-    if (!semana) return
+  // Guardar solo el día de hoy en asistencia_diaria
+  async function guardarDiario() {
+    if (!semana || !diaColumnaHoy) return
     setGuardando(true); setMsg('')
+
+    const registros = []
+    const nuevasAlertas = { ...alertasFaltas }
     const bajas = []
+
     for (const t of trabajadores) {
       const obraId = obraSeleccionada[t.id]
-      if (!obraId) continue
-      // Vacaciones y baja se registran como incidencias
+      if (!obraId || obraId === 'VACACIONES' || obraId === 'BAJA') continue
+
+      const a = asistencias[t.id] || {}
+      const valor = parseFloat(a[diaColumnaHoy] ?? (diaColumnaHoy === 'sabado' ? 0.5 : 1.1))
+
+      registros.push({ trabajador_id: t.id, obra_id: obraId, fecha: fechaHoy, valor })
+    }
+
+    // Guardar incidencias (vacaciones/bajas) igual que antes
+    for (const t of trabajadores) {
+      const obraId = obraSeleccionada[t.id]
       if (obraId === 'VACACIONES' || obraId === 'BAJA') {
         await supabase.from('incidencias').upsert({
-          trabajador_id: t.id,
-          semana_id: semana.id,
-          tipo: obraId.toLowerCase(),
-          reportado_por: perfil.id,
+          trabajador_id: t.id, semana_id: semana.id,
+          tipo: obraId.toLowerCase(), reportado_por: perfil.id,
           fecha_inicio: fechasIncidencia[t.id] || null,
           dias_vacaciones: obraId === 'VACACIONES' ? (parseInt(diasVacaciones[t.id]) || 0) : null
         }, { onConflict: 'trabajador_id,semana_id' })
-        // Registrar baja para notificación WhatsApp
-        if (obraId === 'BAJA') {
-          bajas.push({ nombre: t.nombre, fecha: fechasIncidencia[t.id] || new Date().toISOString().split('T')[0] })
-        }
-
-        // Si es vacaciones, descontar días del período activo
+        if (obraId === 'BAJA') bajas.push({ nombre: t.nombre, fecha: fechasIncidencia[t.id] || fechaHoy })
         if (obraId === 'VACACIONES') {
           const diasUsados = parseInt(diasVacaciones[t.id]) || 0
           if (diasUsados > 0) {
-            const { data: periodos } = await supabase
-              .from('vacaciones')
-              .select('id, dias_disponibles, dias_tomados')
-              .eq('trabajador_id', t.id)
-              .eq('activo', true)
-              .order('fecha_otorgamiento', { ascending: true })
-              .limit(1)
-            if (periodos && periodos.length > 0) {
+            const { data: periodos } = await supabase.from('vacaciones')
+              .select('id, dias_disponibles, dias_tomados').eq('trabajador_id', t.id)
+              .eq('activo', true).order('fecha_otorgamiento', { ascending: true }).limit(1)
+            if (periodos?.length > 0) {
               const p = periodos[0]
-              const nuevosDisponibles = Math.max(0, (p.dias_disponibles || 0) - diasUsados)
-              const nuevosTomados = (p.dias_tomados || 0) + diasUsados
-              await supabase.from('vacaciones')
-                .update({ dias_disponibles: nuevosDisponibles, dias_tomados: nuevosTomados })
-                .eq('id', p.id)
+              await supabase.from('vacaciones').update({
+                dias_disponibles: Math.max(0, (p.dias_disponibles || 0) - diasUsados),
+                dias_tomados: (p.dias_tomados || 0) + diasUsados
+              }).eq('id', p.id)
             }
           }
         }
-        continue
       }
-      const nom = nominasPorObra[obraId]
-      if (nom && nom.estado !== 'borrador') continue
-      const nominaId = await getNominaId(obraId)
-      if (!nominaId) continue
-      const a = asistencias[t.id] || {}
-      const dias = calcularDias(a)
-      await supabase.from('asistencias').upsert({
-        nomina_obra_id: nominaId, trabajador_id: t.id,
-        viernes: parseFloat(a.viernes)||0, sabado: parseFloat(a.sabado)||0,
-        domingo: parseFloat(a.domingo)||0, lunes: parseFloat(a.lunes)||0,
-        martes: parseFloat(a.martes)||0, miercoles: parseFloat(a.miercoles)||0,
-        jueves: parseFloat(a.jueves)||0, dias_total: dias,
-        horas_extra: parseFloat(a.horas_extra)||0,
-        prestamos: parseFloat(a.prestamos)||0,
-        bono_aplicado: (t.tiene_bono && dias >= 6) ? 1 : 0,
-        total_pagar: 0
-      }, { onConflict: 'nomina_obra_id,trabajador_id' })
     }
-    setGuardando(false); setMsg('✓ Guardado')
+
+    if (registros.length > 0) {
+      // Llamar API que hace upsert + detecta 3 faltas + notifica WhatsApp
+      const resp = await fetch('/api/asistencia-diaria', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registros, capturado_por: perfil.id })
+      })
+      const data = await resp.json()
+
+      // Actualizar alertas locales
+      if (data.alertas?.length > 0) {
+        data.alertas.forEach(a => { nuevasAlertas[a.trabajador_id] = a.totalFaltas })
+        setAlertasFaltas(nuevasAlertas)
+      }
+    }
+
+    setGuardando(false)
+    setMsg('✓ Asistencia guardada')
     if (bajas.length > 0) setBajasPendientes(bajas)
-    setTimeout(() => setMsg(''), 2000)
+    setTimeout(() => setMsg(''), 3000)
   }
 
+  // Enviar nómina semanal (igual que antes, pero primero guarda el día)
   async function enviar() {
-    await guardar(); setEnviando(true)
+    await guardarDiario()
+    setEnviando(true)
     for (const o of obrasResidente) {
       const nom = nominasPorObra[o.id]
       if (nom && nom.estado === 'borrador') {
         await supabase.from('nominas_obra')
           .update({ estado: 'enviada', enviada_at: new Date().toISOString() })
           .eq('id', nom.id)
-        // Notificar a Kathe por WhatsApp
         try {
           await fetch('/api/notificar-whatsapp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              tipo: 'enviada',
-              obra: o.nombre,
+              tipo: 'enviada', obra: o.nombre,
               residente: perfil.nombre || perfil.email || 'Residente',
               semana: `${semana.semana_num} (${semana.fecha_inicio} al ${semana.fecha_fin})`
             })
@@ -256,7 +322,8 @@ export default function ResidenteView({ perfil }) {
         } catch (e) { console.error('WhatsApp notify error:', e) }
       }
     }
-    await cargarDatos(); setEnviando(false)
+    await cargarDatos()
+    setEnviando(false)
   }
 
   const trabajadoresFiltrados = trabajadores.filter(t => {
@@ -267,7 +334,12 @@ export default function ResidenteView({ perfil }) {
   })
 
   const totalAsignados = trabajadores.filter(t => !!obraSeleccionada[t.id]).length
-  const todasBloqueadas = !cargando && obrasResidente.length > 0 && obrasResidente.filter(o => o && o.id).every(o => nominasPorObra[o.id]?.estado !== 'borrador' && nominasPorObra[o.id]?.estado !== undefined)
+  const todasBloqueadas = !cargando && obrasResidente.length > 0 &&
+    obrasResidente.filter(o => o?.id).every(o =>
+      nominasPorObra[o.id]?.estado !== 'borrador' && nominasPorObra[o.id]?.estado !== undefined)
+
+  // ¿Ya capturé hoy?
+  const yaCaptureroHoy = diaColumnaHoy === null // domingo no hay captura
 
   if (cargando) return (
     <div className="flex items-center justify-center py-20 text-gray-400">
@@ -285,7 +357,6 @@ export default function ResidenteView({ perfil }) {
     </div>
   )
 
-  // Si todas las nóminas están enviadas, mostrar pantalla de confirmación
   if (todasBloqueadas && obrasResidente.length > 0) return (
     <div className="flex items-center justify-center py-20">
       <div className="text-center max-w-md">
@@ -303,13 +374,22 @@ export default function ResidenteView({ perfil }) {
     </div>
   )
 
+  const nombreDiaHoy = diaColumnaHoy
+    ? DIAS_LABEL[DIAS.indexOf(diaColumnaHoy)]
+    : 'Hoy'
+
   return (
     <div>
       {/* Header */}
       <div className="bg-white rounded-2xl border border-gray-100 p-3 mb-3 flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h2 className="font-semibold text-gray-900 text-sm">Captura — {obrasResidente.filter(o => o && o.nombre).map(o => o.nombre).join(' · ')}</h2>
-          <p className="text-xs text-gray-400">Semana {semana.semana_num} · {semana.fecha_inicio} al {semana.fecha_fin}</p>
+          <h2 className="font-semibold text-gray-900 text-sm">
+            Captura — {obrasResidente.filter(o => o?.nombre).map(o => o.nombre).join(' · ')}
+          </h2>
+          <p className="text-xs text-gray-400">
+            Semana {semana.semana_num} · {semana.fecha_inicio} al {semana.fecha_fin}
+            {diaColumnaHoy && <span className="ml-2 text-blue-500 font-medium">· Hoy: {nombreDiaHoy} {fechaHoy}</span>}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {msg && <span className="text-green-600 text-xs font-medium">{msg}</span>}
@@ -320,20 +400,12 @@ export default function ResidenteView({ perfil }) {
                 try {
                   await Promise.all(bajasPendientes.map(b =>
                     fetch('/api/notificar-baja', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        trabajador: b.nombre,
-                        fecha: b.fecha,
-                        obra: obraNames,
-                        residente: perfil.nombre || perfil.email || 'Residente'
-                      })
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ trabajador: b.nombre, fecha: b.fecha, obra: obraNames, residente: perfil.nombre || perfil.email || 'Residente' })
                     })
                   ))
                   alert('✅ Notificación enviada por WhatsApp al Super, Admin y Aux Admin.')
-                } catch (e) {
-                  alert('Error al enviar notificación: ' + e.message)
-                }
+                } catch (e) { alert('Error al enviar notificación: ' + e.message) }
                 setBajasPendientes([])
               }}
               className="px-3 py-1.5 text-xs bg-green-500 text-white rounded-lg hover:bg-green-600 animate-pulse">
@@ -341,11 +413,12 @@ export default function ResidenteView({ perfil }) {
             </button>
           )}
           {!todasBloqueadas && <>
-            <button onClick={guardar} disabled={guardando}
+            <button onClick={guardarDiario} disabled={guardando || !diaColumnaHoy}
               className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">
-              {guardando ? 'Guardando...' : '💾 Guardar'}
+              {guardando ? 'Guardando...' : `💾 Guardar ${nombreDiaHoy}`}
             </button>
-            <button onClick={() => { if (confirm('¿Enviar nómina? Ya no podrás modificarla.')) enviar() }}
+            <button
+              onClick={() => { if (confirm('¿Enviar nómina de la semana? Ya no podrás modificarla.')) enviar() }}
               disabled={enviando}
               className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
               {enviando ? 'Enviando...' : 'Enviar nómina →'}
@@ -354,6 +427,14 @@ export default function ResidenteView({ perfil }) {
           {todasBloqueadas && <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">✓ Enviada</span>}
         </div>
       </div>
+
+      {/* Banner día de captura */}
+      {diaColumnaHoy && (
+        <div className="mb-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-700 flex items-center gap-2">
+          <span>📋</span>
+          <span>Capturando asistencia del <strong>{nombreDiaHoy} {fechaHoy}</strong>. Los días anteriores se muestran en gris (ya guardados).</span>
+        </div>
+      )}
 
       {/* Filtros */}
       <div className="flex items-center justify-between mb-2">
@@ -368,9 +449,9 @@ export default function ResidenteView({ perfil }) {
         <span className="text-xs text-gray-400">{totalAsignados} de {trabajadores.length} asignados</span>
       </div>
 
-      {/* Tabla con scroll horizontal */}
+      {/* Tabla */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto" style={{overflowX:'auto'}}>
+        <div className="overflow-x-auto">
           <table style={{borderCollapse:'collapse', fontSize:'12px', whiteSpace:'nowrap'}}>
             <thead>
               <tr style={{borderBottom:'1px solid #f3f4f6', background:'#f9fafb'}}>
@@ -378,9 +459,20 @@ export default function ResidenteView({ perfil }) {
                 <th style={{textAlign:'left', padding:'8px 8px', color:'#9ca3af', fontWeight:500, minWidth:'180px'}}>Trabajador</th>
                 <th style={{textAlign:'left', padding:'8px 8px', color:'#9ca3af', fontWeight:500, minWidth:'130px'}}>Puesto</th>
                 <th style={{textAlign:'left', padding:'8px 8px', color:'#9ca3af', fontWeight:500, minWidth:'110px'}}>Obra</th>
-                {DIAS_LABEL.map(d => (
-                  <th key={d} style={{textAlign:'center', padding:'8px 4px', color:'#9ca3af', fontWeight:500, width:'52px'}}>{d}</th>
-                ))}
+                {DIAS.map((d, i) => {
+                  const esHoy = d === diaColumnaHoy
+                  return (
+                    <th key={d} style={{
+                      textAlign:'center', padding:'8px 4px', width:'52px',
+                      color: esHoy ? '#2563eb' : '#9ca3af',
+                      fontWeight: esHoy ? 700 : 500,
+                      background: esHoy ? '#eff6ff' : '#f9fafb',
+                      borderBottom: esHoy ? '2px solid #2563eb' : undefined
+                    }}>
+                      {DIAS_LABEL[i]}{esHoy ? ' ●' : ''}
+                    </th>
+                  )
+                })}
                 <th style={{textAlign:'center', padding:'8px 6px', color:'#9ca3af', fontWeight:500, width:'44px'}}>Días</th>
                 <th style={{textAlign:'center', padding:'8px 6px', color:'#9ca3af', fontWeight:500, width:'60px'}}>H.Extra</th>
               </tr>
@@ -397,26 +489,28 @@ export default function ResidenteView({ perfil }) {
                 const esVacaciones = obraId === 'VACACIONES'
                 const esBaja = obraId === 'BAJA'
                 const esIncidencia = esVacaciones || esBaja
-                // Fecha de incidencia para calcular días bloqueados
                 const fechaIncidencia = fechasIncidencia[t.id] ? new Date(fechasIncidencia[t.id]) : null
-                // Mapeo de días de la semana a fechas
-                const fechasSemana = {
-                  viernes: semana ? new Date(semana.fecha_inicio) : null,
-                  sabado: semana ? new Date(new Date(semana.fecha_inicio).getTime() + 86400000) : null,
-                  domingo: semana ? new Date(new Date(semana.fecha_inicio).getTime() + 2*86400000) : null,
-                  lunes: semana ? new Date(new Date(semana.fecha_inicio).getTime() + 3*86400000) : null,
-                  martes: semana ? new Date(new Date(semana.fecha_inicio).getTime() + 4*86400000) : null,
-                  miercoles: semana ? new Date(new Date(semana.fecha_inicio).getTime() + 5*86400000) : null,
-                  jueves: semana ? new Date(new Date(semana.fecha_inicio).getTime() + 6*86400000) : null,
-                }
+                const faltas30 = alertasFaltas[t.id] || 0
+                const tieneAlertaFaltas = faltas30 >= 3
 
                 return (
-                  <tr key={t.id} style={{borderBottom:'1px solid #f9fafb', background: esBaja ? '#fef2f2' : esVacaciones ? '#f0f9ff' : sinObra ? '#fafafa' : tieneFalta ? '#fff5f5' : 'white'}}>
-                    <td style={{padding:'6px 8px', color:'#d1d5db', position:'sticky', left:0, background: sinObra ? '#fafafa' : tieneFalta ? '#fff5f5' : 'white', zIndex:1}}>
-                      {(t.num_empleado == null ? 'NA' : String(t.num_empleado).padStart(4,'0'))}
+                  <tr key={t.id} style={{
+                    borderBottom:'1px solid #f9fafb',
+                    background: esBaja ? '#fef2f2' : esVacaciones ? '#f0f9ff' : tieneAlertaFaltas ? '#fff7ed' : sinObra ? '#fafafa' : tieneFalta ? '#fff5f5' : 'white'
+                  }}>
+                    <td style={{padding:'6px 8px', color:'#d1d5db', position:'sticky', left:0, background: sinObra ? '#fafafa' : tieneAlertaFaltas ? '#fff7ed' : tieneFalta ? '#fff5f5' : 'white', zIndex:1}}>
+                      {t.num_empleado == null ? 'NA' : String(t.num_empleado).padStart(4,'0')}
                     </td>
                     <td style={{padding:'6px 8px', fontWeight:500, color: sinObra ? '#9ca3af' : '#111827'}}>
-                      {t.nombre}
+                      <div style={{display:'flex', alignItems:'center', gap:'4px'}}>
+                        {t.nombre}
+                        {tieneAlertaFaltas && (
+                          <span title={`${faltas30} faltas en los últimos 30 días`}
+                            style={{fontSize:'10px', background:'#fed7aa', color:'#c2410c', borderRadius:'10px', padding:'1px 6px', fontWeight:600}}>
+                            ⚠️ {faltas30} faltas
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{padding:'6px 8px', color:'#6b7280'}}>{t.puesto}</td>
                     <td style={{padding:'6px 8px'}}>
@@ -424,7 +518,7 @@ export default function ResidenteView({ perfil }) {
                         disabled={bloqueado}
                         style={{fontSize:'11px', border:'1px solid', borderColor: obraId ? '#93c5fd' : '#e5e7eb', borderRadius:'6px', padding:'2px 4px', width:'105px', background: obraId ? '#eff6ff' : 'white', color: obraId ? '#1d4ed8' : '#6b7280'}}>
                         <option value="">— Sin asignar —</option>
-                        {obrasResidente.filter(o => o && o.id).map(o => (
+                        {obrasResidente.filter(o => o?.id).map(o => (
                           <option key={o.id} value={o.id}>{o.nombre}</option>
                         ))}
                         <option value="VACACIONES">🏖 Vacaciones</option>
@@ -436,7 +530,6 @@ export default function ResidenteView({ perfil }) {
                             value={fechasIncidencia[t.id] || ''}
                             onChange={e => updateFecha(t.id, e.target.value)}
                             disabled={bloqueado}
-                            placeholder={esVacaciones ? 'Inicio vacaciones' : 'Fecha de baja'}
                             style={{fontSize:'10px', border:'1px solid #e5e7eb', borderRadius:'4px', padding:'2px 4px', width:'105px', color: esVacaciones ? '#0369a1' : '#dc2626'}}
                           />
                           <div style={{fontSize:'9px', color:'#9ca3af', marginTop:'1px'}}>
@@ -458,40 +551,42 @@ export default function ResidenteView({ perfil }) {
                       )}
                     </td>
                     {DIAS.map(d => {
+                      const esHoy = d === diaColumnaHoy
                       const maxVal = d === 'sabado' ? 0.5 : 1.1
                       const rawVal = a[d] ?? (d === 'sabado' ? 0.5 : 1.1)
                       const val = parseFloat(rawVal)
-                      const bloqIncidencia = esIncidencia && fechaIncidencia && fechasSemana[d] && fechasSemana[d] >= fechaIncidencia
-                      const disabled = bloqueado || sinObra || bloqIncidencia
-                      // Color semáforo: rojo=0, amarillo=parcial, verde=completo
+                      const bloqIncidencia = esIncidencia && fechaIncidencia && fechasSemana[d] && new Date(fechasSemana[d]) >= fechaIncidencia
+                      // Días pasados: readonly (ya guardados), solo hoy es editable
+                      const esPasado = fechasSemana[d] && fechasSemana[d] < fechaHoy
+                      const disabled = bloqueado || sinObra || bloqIncidencia || (!esHoy && !esPasado ? false : !esHoy)
+
                       const esCero = val === 0
                       const esParcial = val > 0 && val < maxVal
-                      const borderColor = bloqIncidencia ? '#e5e7eb' : esCero ? '#fca5a5' : esParcial ? '#fcd34d' : '#86efac'
-                      const bgColor = bloqIncidencia ? '#f3f4f6' : sinObra ? '#f9fafb' : esCero ? '#fef2f2' : esParcial ? '#fffbeb' : 'white'
-                      const textColor = bloqIncidencia ? '#9ca3af' : sinObra ? '#d1d5db' : esCero ? '#ef4444' : esParcial ? '#b45309' : '#374151'
+                      const borderColor = bloqIncidencia ? '#e5e7eb' : esCero ? '#fca5a5' : esParcial ? '#fcd34d' : esHoy ? '#86efac' : '#e5e7eb'
+                      const bgColor = !esHoy && esPasado ? '#f9fafb' : bloqIncidencia ? '#f3f4f6' : sinObra ? '#f9fafb' : esCero ? '#fef2f2' : esParcial ? '#fffbeb' : esHoy ? '#f0fdf4' : 'white'
+                      const textColor = (!esHoy && esPasado) ? '#9ca3af' : bloqIncidencia ? '#9ca3af' : sinObra ? '#d1d5db' : esCero ? '#ef4444' : esParcial ? '#b45309' : '#374151'
+
                       return (
-                        <td key={d} style={{padding:'4px 2px', textAlign:'center'}}>
+                        <td key={d} style={{padding:'4px 2px', textAlign:'center', background: esHoy ? '#f0fdf4' : undefined}}>
                           <input
                             type="number"
-                            min={0}
-                            max={maxVal}
-                            step={0.1}
+                            min={0} max={maxVal} step={0.1}
                             value={val}
                             onChange={e => {
+                              if (!esHoy) return
                               let v = parseFloat(e.target.value)
                               if (isNaN(v)) v = 0
-                              if (v > maxVal) v = maxVal
-                              if (v < 0) v = 0
-                              // Redondear a 1 decimal
-                              v = Math.round(v * 10) / 10
+                              v = Math.min(Math.max(Math.round(v * 10) / 10, 0), maxVal)
                               updateAsistencia(t.id, d, v)
                             }}
                             disabled={disabled}
+                            readOnly={!esHoy}
                             style={{
-                              width:'46px', fontSize:'11px', fontWeight: esParcial ? 600 : 400,
+                              width:'46px', fontSize:'11px', fontWeight: esHoy ? 600 : 400,
                               border:`1px solid ${borderColor}`, borderRadius:'4px',
                               padding:'2px 4px', textAlign:'center',
                               background: bgColor, color: textColor,
+                              cursor: !esHoy ? 'default' : 'text',
                               outline:'none'
                             }}
                           />
@@ -499,7 +594,9 @@ export default function ResidenteView({ perfil }) {
                       )
                     })}
                     <td style={{padding:'4px 6px', textAlign:'center', fontWeight:600, color: sinObra ? '#d1d5db' : tieneFalta ? '#ef4444' : '#374151'}}>
-                      {esVacaciones ? <span style={{fontSize:'10px',color:'#0369a1',background:'#e0f2fe',padding:'1px 6px',borderRadius:'10px'}}>Vac</span> : esBaja ? <span style={{fontSize:'10px',color:'#dc2626',background:'#fee2e2',padding:'1px 6px',borderRadius:'10px'}}>Baja</span> : sinObra ? '—' : dias % 1 === 0 ? dias : dias.toFixed(1)}
+                      {esVacaciones ? <span style={{fontSize:'10px',color:'#0369a1',background:'#e0f2fe',padding:'1px 6px',borderRadius:'10px'}}>Vac</span>
+                        : esBaja ? <span style={{fontSize:'10px',color:'#dc2626',background:'#fee2e2',padding:'1px 6px',borderRadius:'10px'}}>Baja</span>
+                        : sinObra ? '—' : dias % 1 === 0 ? dias : dias.toFixed(1)}
                     </td>
                     <td style={{padding:'4px 4px', textAlign:'center'}}>
                       <input type="number" min="0" max="20" step="0.5"
@@ -507,7 +604,8 @@ export default function ResidenteView({ perfil }) {
                         placeholder="0"
                         onChange={e => updateAsistencia(t.id, 'horas_extra', e.target.value)}
                         disabled={bloqueado || sinObra}
-                        style={{width:'50px', fontSize:'11px', border:'1px solid #e5e7eb', borderRadius:'4px', padding:'2px 4px', textAlign:'center', background: (sinObra || esIncidencia) ? '#f9fafb' : 'white', color: (sinObra || esIncidencia) ? '#d1d5db' : '#374151'}} />
+                        style={{width:'50px', fontSize:'11px', border:'1px solid #e5e7eb', borderRadius:'4px', padding:'2px 4px', textAlign:'center', background: (sinObra || esIncidencia) ? '#f9fafb' : 'white', color: (sinObra || esIncidencia) ? '#d1d5db' : '#374151'}}
+                      />
                     </td>
                   </tr>
                 )
@@ -516,7 +614,12 @@ export default function ResidenteView({ perfil }) {
             <tfoot>
               <tr style={{borderTop:'2px solid #e5e7eb', background:'#f9fafb'}}>
                 <td colSpan={11} style={{padding:'8px', fontSize:'11px', color:'#9ca3af'}}>
-                  {totalAsignados} trabajadores asignados · {trabajadores.filter(t => obraSeleccionada[t.id] && calcularDias(asistencias[t.id]||{}) < 6.0).length} con falta
+                  {totalAsignados} trabajadores asignados
+                  {Object.values(alertasFaltas).filter(v => v >= 3).length > 0 && (
+                    <span style={{color:'#c2410c', marginLeft:'8px'}}>
+                      · ⚠️ {Object.values(alertasFaltas).filter(v => v >= 3).length} con 3+ faltas en 30 días
+                    </span>
+                  )}
                 </td>
                 <td style={{padding:'8px', textAlign:'center', fontSize:'11px', fontWeight:600, color:'#374151'}}>
                   {trabajadores.reduce((s,t) => s + (parseFloat((asistencias[t.id]||{}).horas_extra)||0), 0)}h
