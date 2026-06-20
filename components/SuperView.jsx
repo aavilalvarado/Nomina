@@ -1036,6 +1036,7 @@ export default function SuperView({ perfil }) {
                   <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>Puesto</th>
                   <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>Desde</th>
                   <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>Reportado por</th>
+                  <th style={{textAlign:'left',padding:'10px 12px',color:'#0369a1',fontWeight:500}}>Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -1046,6 +1047,7 @@ export default function SuperView({ perfil }) {
                     <td style={{padding:'8px 12px',color:'#6b7280',fontSize:'12px'}}>{i.trabajador?.puesto}</td>
                     <td style={{padding:'8px 12px',color:'#0369a1'}}>{i.fecha_inicio || '—'}</td>
                     <td style={{padding:'8px 12px',color:'#6b7280'}}>{i.reportado?.nombre}</td>
+                    <td style={{padding:'8px 12px'}}><button onClick={async () => { if (confirm(`¿Eliminar vacación de ${i.trabajador?.nombre}?`)) { await supabase.from('incidencias').delete().eq('id',i.id); cargarIncidencias(); setMsg('✓ Vacación eliminada'); setTimeout(()=>setMsg(''),3000) } }} style={{fontSize:'11px',color:'#ef4444',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'6px',padding:'2px 8px',cursor:'pointer'}}>🗑 Eliminar</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -1093,6 +1095,7 @@ export default function SuperView({ perfil }) {
                       }} className="text-xs bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700">
                         Confirmar baja
                       </button>
+                      <button onClick={async () => { if (confirm(`¿Eliminar el reporte de baja de ${i.trabajador?.nombre}? El trabajador seguirá activo.`)) { await supabase.from('incidencias').delete().eq('id',i.id); cargarIncidencias(); setMsg('✓ Baja eliminada'); setTimeout(()=>setMsg(''),3000) } }} style={{marginLeft:'6px',fontSize:'11px',color:'#6b7280',background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:'6px',padding:'2px 8px',cursor:'pointer'}}>🗑 Eliminar</button>
                     </td>
                   </tr>
                 ))}
@@ -1150,95 +1153,6 @@ export default function SuperView({ perfil }) {
       {/* TAB: PERSONAL */}
       {tab === 'personal' && (
         <div>
-          {/* Formulario alta trabajador */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-4">
-            <h3 className="font-semibold text-gray-900 mb-3 text-sm">➕ Dar de alta nuevo trabajador</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">No. Empleado</label>
-                <input type="number" placeholder="095"
-                  value={nuevoTrabajador.num_empleado}
-                  onChange={e => setNuevoTrabajador(p=>({...p,num_empleado:e.target.value}))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              </div>
-              <div className="col-span-2">
-                <label className="text-xs text-gray-500 mb-1 block">Nombre completo</label>
-                <input type="text" placeholder="APELLIDO APELLIDO NOMBRE"
-                  value={nuevoTrabajador.nombre}
-                  onChange={e => setNuevoTrabajador(p=>({...p,nombre:e.target.value.toUpperCase()}))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Puesto</label>
-                <input type="text" placeholder="OFICIAL ALBAÑIL"
-                  value={nuevoTrabajador.puesto}
-                  onChange={e => setNuevoTrabajador(p=>({...p,puesto:e.target.value.toUpperCase()}))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Obra</label>
-                <select value={nuevoTrabajador.obra_id}
-                  onChange={e => setNuevoTrabajador(p=>({...p,obra_id:e.target.value}))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                  <option value="">— Seleccionar —</option>
-                  {todosObras.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Forma de pago</label>
-                <select value={nuevoTrabajador.forma_pago}
-                  onChange={e => setNuevoTrabajador(p=>({...p,forma_pago:e.target.value}))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                  <option>TRANSFERENCIA</option>
-                  <option>EFECTIVO</option>
-                  <option>CHEQUE</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Sueldo semanal</label>
-                <input type="number" placeholder="3500"
-                  value={nuevoTrabajador.sueldo_semanal}
-                  onChange={e => setNuevoTrabajador(p=>({...p,sueldo_semanal:e.target.value}))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              </div>
-              <div className="flex items-end">
-                <label className="flex items-center gap-2 text-sm text-gray-600 mb-2 cursor-pointer">
-                  <input type="checkbox" checked={nuevoTrabajador.tiene_bono}
-                    onChange={e => setNuevoTrabajador(p=>({...p,tiene_bono:e.target.checked}))}
-                    className="w-4 h-4" />
-                  Tiene bono
-                </label>
-              </div>
-            </div>
-            <div className="flex justify-end mt-3">
-              <button disabled={guardandoTrab || !nuevoTrabajador.nombre || !nuevoTrabajador.num_empleado}
-                onClick={async () => {
-                  setGuardandoTrab(true)
-                  const { error } = await supabase.from('trabajadores').insert({
-                    num_empleado: nuevoTrabajador.num_empleado === 'NA' ? 'NA' : nuevoTrabajador.num_empleado,
-                    nombre: nuevoTrabajador.nombre.trim(),
-                    puesto: nuevoTrabajador.puesto.trim(),
-                    obra_id: nuevoTrabajador.obra_id || null,
-                    forma_pago: nuevoTrabajador.forma_pago,
-                    sueldo_semanal: parseFloat(nuevoTrabajador.sueldo_semanal) || 0,
-                    tiene_bono: nuevoTrabajador.tiene_bono,
-                    activo: true
-                  })
-                  if (error) { alert('Error: ' + error.message) }
-                  else {
-                    setMsg('✓ Trabajador dado de alta')
-                    setNuevoTrabajador({num_empleado:'',nombre:'',puesto:'',obra_id:'',forma_pago:'TRANSFERENCIA',sueldo_semanal:'',tiene_bono:true})
-                    const { data } = await supabase.from('trabajadores').select('*, obra:obras(nombre)').eq('activo', true).order('num_empleado')
-                    setTodosTrabajadores(data || [])
-                    setTimeout(()=>setMsg(''),3000)
-                  }
-                  setGuardandoTrab(false)
-                }}
-                className="px-6 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium">
-                {guardandoTrab ? 'Guardando...' : '✓ Dar de alta'}
-              </button>
-            </div>
-          </div>
 
           {/* Lista de trabajadores */}
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
