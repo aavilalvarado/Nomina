@@ -186,8 +186,11 @@ function IncidenciasPreview({ semana, supabase }) {
     }
     setFechas(dias)
 
+    // Obtener TODAS las nóminas de la semana (todas las obras)
     const { data: nominas } = await supabase
-      .from('nominas_obra').select('id').eq('semana_id', semana.id)
+      .from('nominas_obra')
+      .select('id, obra:obras(nombre)')
+      .eq('semana_id', semana.id)
     
     const empleadosMap = {}
     for (const nom of (nominas || [])) {
@@ -213,6 +216,17 @@ function IncidenciasPreview({ semana, supabase }) {
       if (he > 0) return { clave: `${Math.round(he)}HE2`, color: '#00B050' }
       if (val === 0) return { clave: '1FINJ', color: '#FF0000' }
       return { clave: '', color: '' }
+    }
+    
+    // Calcular HE2 neto considerando faltas (9 horas = 1 día)
+    const calcHeNeto = (emp) => {
+      if (emp.he <= 0) return 0
+      // Contar faltas
+      const dias = [emp.vie, emp.sab, emp.lun, emp.mar, emp.mie, emp.jue]
+      const faltas = dias.filter(d => d === 0).length
+      const horasFalta = faltas * 9 // 9 horas por día
+      const heNeto = emp.he - horasFalta
+      return Math.max(0, heNeto)
     }
 
     const resultado = []
@@ -471,164 +485,6 @@ function VacacionesControl({ vacaciones, supabase, onUpdate }) {
   )
 }
 
-
-function EstadoVacaciones({ supabase, semanaActual }) {
-  const [deVacaciones, setDeVacaciones] = useState([])
-  const [puedenTomar, setPuedenTomar] = useState([])
-  const [yaTomaron, setYaTomaron] = useState([])
-  const [cargando, setCargando] = useState(true)
-
-  useEffect(() => { cargar() }, [semanaActual])
-
-  async function cargar() {
-    setCargando(true)
-
-    // 1. De vacaciones esta semana (incidencias tipo vacaciones de semana actual)
-    if (semanaActual) {
-      const { data: inc } = await supabase
-        .from('incidencias')
-        .select('*, trabajador:trabajadores(num_empleado, nombre, puesto, obra:obras(nombre))')
-        .eq('semana_id', semanaActual.id)
-        .eq('tipo', 'vacaciones')
-      setDeVacaciones(inc || [])
-    }
-
-    // 2. Todos los períodos activos
-    const { data: vacs } = await supabase
-      .from('vacaciones')
-      .select('*, trabajador:trabajadores(num_empleado, nombre, puesto, obra:obras(nombre))')
-      .eq('activo', true)
-      .order('fecha_vencimiento', { ascending: true })
-
-    const hoy = new Date()
-    const activos = (vacs || []).filter(v => new Date(v.fecha_vencimiento) >= hoy)
-
-    // Pueden tomar: tienen días disponibles
-    const sorted = (arr) => [...arr].sort((a,b) => (a.trabajador?.num_empleado ?? 9999) - (b.trabajador?.num_empleado ?? 9999))
-    setPuedenTomar(sorted(activos.filter(v => (v.dias_disponibles - v.dias_tomados) > 0)))
-
-    // Ya tomaron: tienen días tomados pero aún tienen período activo
-    setYaTomaron(sorted(activos.filter(v => v.dias_tomados > 0)))
-
-    setCargando(false)
-  }
-
-  const SeccionHeader = ({ color, emoji, titulo, count }) => (
-    <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px', marginTop:'20px'}}>
-      <div style={{width:'4px', height:'20px', background:color, borderRadius:'2px'}} />
-      <span style={{fontWeight:600, color:'#111827', fontSize:'14px'}}>{emoji} {titulo}</span>
-      <span style={{fontSize:'12px', color:'#9ca3af', background:'#f3f4f6', borderRadius:'10px', padding:'1px 8px'}}>{count}</span>
-    </div>
-  )
-
-  const TablaTrabajadores = ({ datos, cols, renderRow }) => (
-    <div style={{background:'white', borderRadius:'12px', border:'1px solid #f3f4f6', overflow:'hidden', marginBottom:'4px'}}>
-      <table style={{width:'100%', borderCollapse:'collapse', fontSize:'12px'}}>
-        <thead>
-          <tr style={{background:'#f9fafb', borderBottom:'1px solid #f3f4f6'}}>
-            {cols.map(c => (
-              <th key={c} style={{textAlign:'left', padding:'8px 12px', color:'#9ca3af', fontWeight:500}}>{c}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {datos.length === 0
-            ? <tr><td colSpan={cols.length} style={{padding:'20px', textAlign:'center', color:'#9ca3af'}}>Sin registros</td></tr>
-            : datos.map((d, i) => renderRow(d, i))
-          }
-        </tbody>
-      </table>
-    </div>
-  )
-
-  if (cargando) return <div style={{padding:'40px', textAlign:'center', color:'#9ca3af'}}>Cargando...</div>
-
-  return (
-    <div>
-      {/* DE VACACIONES AHORA */}
-      <SeccionHeader color="#0ea5e9" emoji="🏖" titulo="De vacaciones esta semana" count={deVacaciones.length} />
-      <TablaTrabajadores
-        datos={deVacaciones}
-        cols={['#', 'Trabajador', 'Puesto', 'Obra', 'Inicio']}
-        renderRow={(inc, i) => (
-          <tr key={inc.id} style={{borderBottom:'1px solid #f9fafb', background: i%2===0?'white':'#f0f9ff'}}>
-            <td style={{padding:'8px 12px', color:'#9ca3af', fontFamily:'monospace'}}>
-              {inc.trabajador?.num_empleado == null ? 'NA' : String(inc.trabajador.num_empleado).padStart(4,'0')}
-            </td>
-            <td style={{padding:'8px 12px', fontWeight:500}}>{inc.trabajador?.nombre}</td>
-            <td style={{padding:'8px 12px', color:'#6b7280'}}>{inc.trabajador?.puesto}</td>
-            <td style={{padding:'8px 12px', color:'#6b7280'}}>{inc.trabajador?.obra?.nombre || '—'}</td>
-            <td style={{padding:'8px 12px', color:'#0369a1'}}>{inc.fecha_inicio || '—'}</td>
-          </tr>
-        )}
-      />
-
-      {/* PUEDEN TOMAR */}
-      <SeccionHeader color="#16a34a" emoji="✅" titulo="Pueden tomar vacaciones" count={puedenTomar.length} />
-      <TablaTrabajadores
-        datos={puedenTomar}
-        cols={['#', 'Trabajador', 'Puesto', 'Obra', 'Disponibles', 'Tomadas', 'Vence']}
-        renderRow={(v, i) => {
-          const disp = v.dias_disponibles - v.dias_tomados
-          const venc = new Date(v.fecha_vencimiento)
-          const dias = Math.ceil((venc - new Date()) / (1000*60*60*24))
-          const proxima = dias <= 30
-          return (
-            <tr key={v.id} style={{borderBottom:'1px solid #f9fafb', background: i%2===0?'white':'#f0fdf4'}}>
-              <td style={{padding:'8px 12px', color:'#9ca3af', fontFamily:'monospace'}}>
-                {v.trabajador?.num_empleado == null ? 'NA' : String(v.trabajador.num_empleado).padStart(4,'0')}
-              </td>
-              <td style={{padding:'8px 12px', fontWeight:500}}>{v.trabajador?.nombre}</td>
-              <td style={{padding:'8px 12px', color:'#6b7280'}}>{v.trabajador?.puesto}</td>
-              <td style={{padding:'8px 12px', color:'#6b7280'}}>{v.trabajador?.obra?.nombre || '—'}</td>
-              <td style={{padding:'8px 12px', textAlign:'center'}}>
-                <span style={{fontWeight:700, color:'#7c3aed', fontSize:'13px'}}>{disp}</span>
-                <span style={{color:'#9ca3af', fontSize:'10px'}}> días</span>
-              </td>
-              <td style={{padding:'8px 12px', textAlign:'center', color:'#6b7280'}}>{v.dias_tomados}</td>
-              <td style={{padding:'8px 12px', fontSize:'11px', color: proxima ? '#d97706' : '#6b7280'}}>
-                {v.fecha_vencimiento}
-                <div style={{fontSize:'10px', color: proxima ? '#f59e0b' : '#9ca3af'}}>
-                  {proxima ? `⚠ ${dias} días` : `${dias} días`}
-                </div>
-              </td>
-            </tr>
-          )
-        }}
-      />
-
-      {/* YA TOMARON */}
-      <SeccionHeader color="#6b7280" emoji="📋" titulo="Ya tomaron vacaciones" count={yaTomaron.length} />
-      <TablaTrabajadores
-        datos={yaTomaron}
-        cols={['#', 'Trabajador', 'Puesto', 'Obra', 'Otorgadas', 'Tomadas', 'Restantes']}
-        renderRow={(v, i) => {
-          const disp = v.dias_disponibles - v.dias_tomados
-          const pct = Math.round((v.dias_tomados / v.dias_disponibles) * 100)
-          return (
-            <tr key={v.id} style={{borderBottom:'1px solid #f9fafb', background: i%2===0?'white':'#fafafa'}}>
-              <td style={{padding:'8px 12px', color:'#9ca3af', fontFamily:'monospace'}}>
-                {v.trabajador?.num_empleado == null ? 'NA' : String(v.trabajador.num_empleado).padStart(4,'0')}
-              </td>
-              <td style={{padding:'8px 12px', fontWeight:500}}>{v.trabajador?.nombre}</td>
-              <td style={{padding:'8px 12px', color:'#6b7280'}}>{v.trabajador?.puesto}</td>
-              <td style={{padding:'8px 12px', color:'#6b7280'}}>{v.trabajador?.obra?.nombre || '—'}</td>
-              <td style={{padding:'8px 12px', textAlign:'center', color:'#374151', fontWeight:600}}>{v.dias_disponibles}</td>
-              <td style={{padding:'8px 12px', textAlign:'center', color:'#374151'}}>{v.dias_tomados}</td>
-              <td style={{padding:'8px 12px', textAlign:'center'}}>
-                <span style={{fontWeight:600, color: disp > 0 ? '#7c3aed' : '#9ca3af'}}>{disp}</span>
-                <div style={{height:'4px', background:'#e5e7eb', borderRadius:'2px', marginTop:'3px', width:'50px', margin:'3px auto 0'}}>
-                  <div style={{height:'4px', background:'#8b5cf6', borderRadius:'2px', width: pct + '%'}} />
-                </div>
-              </td>
-            </tr>
-          )
-        }}
-      />
-    </div>
-  )
-}
-
 export default function SuperView({ perfil }) {
   const [semanas, setSemanas] = useState([])
   const [semanaActual, setSemanaActual] = useState(null)
@@ -691,7 +547,6 @@ export default function SuperView({ perfil }) {
     const { data: vacs } = await supabase
       .from('vacaciones')
       .select('*, trabajador:trabajadores(num_empleado, nombre, puesto, fecha_ingreso, obra:obras(nombre))')
-      .eq('activo', true)
       .order('fecha_vencimiento', { ascending: true })
     setVacacionesData(vacs || [])
 
@@ -896,7 +751,11 @@ export default function SuperView({ perfil }) {
         getClave(emp.lun),
         getClave(emp.mar),
         getClave(emp.mie),
-        emp.he > 0 ? `${Math.round(emp.he)}HE2` : getClave(emp.jue),
+        (() => {
+          const faltas = [emp.vie, emp.sab, emp.lun, emp.mar, emp.mie, emp.jue].filter(d=>d===0).length
+          const heNeto = Math.max(0, emp.he - (faltas * 9))
+          return heNeto > 0 ? `${Math.round(heNeto)}HE2` : getClave(emp.jue)
+        })(),
       ]
       if (claves.some(c => c)) {
         rows.push([emp.codigo, emp.nombre, ...claves])
@@ -960,9 +819,9 @@ export default function SuperView({ perfil }) {
     { id:'obras-inactivas', label:'📁 Obras inactivas', badge: obrasInactivas.length || null },
     { id:'contpaqi', label:'📊 CONTPAQi', badge: null },
     { id:'personal', label:'👷 Personal', badge: null },
+    { id:'alta-trabajador', label:'➕ Alta', badge: null },
     { id:'prestamos', label:'💰 Préstamos', badge: null },
     { id:'vac-control', label:'🌴 Vacaciones', badge: null },
-    { id:'estado-vacaciones', label:'📋 Estado Vacaciones', badge: null },
   ]
 
   return (
@@ -1026,6 +885,17 @@ export default function SuperView({ perfil }) {
                 </div>
                 <p className="text-xs text-gray-400">{n.residente?.nombre}</p>
                 {n.estado==='enviada' && <p className="text-xs text-blue-500 mt-1 font-medium">Clic para revisar →</p>}
+                <button onClick={async (e) => {
+                  e.stopPropagation()
+                  if (!confirm(`¿Borrar la nómina de ${n.obra?.nombre}? Se eliminará la asistencia capturada.`)) return
+                  await supabase.from('asistencias').delete().eq('nomina_obra_id', n.id)
+                  await supabase.from('nominas_obra').delete().eq('id', n.id)
+                  cargarNominas()
+                  setMsg('✓ Nómina eliminada')
+                  setTimeout(()=>setMsg(''),3000)
+                }} style={{marginTop:'6px',fontSize:'10px',color:'#ef4444',background:'transparent',border:'none',cursor:'pointer',padding:0}}>
+                  🗑 Eliminar nómina
+                </button>
               </div>
             ))}
           </div>
@@ -1402,6 +1272,107 @@ export default function SuperView({ perfil }) {
         </div>
       )}
 
+      {/* TAB: ALTA TRABAJADOR */}
+      {tab === 'alta-trabajador' && (
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <h3 className="font-semibold text-gray-900 mb-4 text-sm">➕ Dar de alta nuevo trabajador</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">No. Empleado</label>
+              <input type="text" placeholder="095 o NA"
+                value={nuevoTrabajador.num_empleado}
+                onChange={e => setNuevoTrabajador(p=>({...p,num_empleado:e.target.value}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-gray-500 mb-1 block">Nombre completo</label>
+              <input type="text" placeholder="APELLIDO APELLIDO NOMBRE"
+                value={nuevoTrabajador.nombre}
+                onChange={e => setNuevoTrabajador(p=>({...p,nombre:e.target.value.toUpperCase()}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Puesto</label>
+              <input type="text" placeholder="OFICIAL ALBAÑIL"
+                value={nuevoTrabajador.puesto}
+                onChange={e => setNuevoTrabajador(p=>({...p,puesto:e.target.value.toUpperCase()}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Obra</label>
+              <select value={nuevoTrabajador.obra_id}
+                onChange={e => setNuevoTrabajador(p=>({...p,obra_id:e.target.value}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                <option value="">— Seleccionar —</option>
+                {todosObras.map(o => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Forma de pago</label>
+              <select value={nuevoTrabajador.forma_pago}
+                onChange={e => setNuevoTrabajador(p=>({...p,forma_pago:e.target.value}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                <option>TRANSFERENCIA</option>
+                <option>EFECTIVO</option>
+                <option>CHEQUE</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Sueldo semanal</label>
+              <input type="number" placeholder="3500"
+                value={nuevoTrabajador.sueldo_semanal}
+                onChange={e => setNuevoTrabajador(p=>({...p,sueldo_semanal:e.target.value}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Fecha ingreso</label>
+              <input type="date"
+                value={nuevoTrabajador.fecha_ingreso || ''}
+                onChange={e => setNuevoTrabajador(p=>({...p,fecha_ingreso:e.target.value}))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div className="flex items-end pb-1">
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <input type="checkbox" checked={nuevoTrabajador.tiene_bono}
+                  onChange={e => setNuevoTrabajador(p=>({...p,tiene_bono:e.target.checked}))}
+                  className="w-4 h-4" />
+                Tiene bono
+              </label>
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button disabled={guardandoTrab || !nuevoTrabajador.nombre || !nuevoTrabajador.num_empleado}
+              onClick={async () => {
+                setGuardandoTrab(true)
+                const numEmp = nuevoTrabajador.num_empleado.toUpperCase() === 'NA' ? null : parseInt(nuevoTrabajador.num_empleado)
+                const { error } = await supabase.from('trabajadores').insert({
+                  num_empleado: numEmp,
+                  nombre: nuevoTrabajador.nombre.trim(),
+                  puesto: nuevoTrabajador.puesto.trim(),
+                  obra_id: nuevoTrabajador.obra_id || null,
+                  forma_pago: nuevoTrabajador.forma_pago,
+                  sueldo_semanal: parseFloat(nuevoTrabajador.sueldo_semanal) || 0,
+                  tiene_bono: nuevoTrabajador.tiene_bono,
+                  fecha_ingreso: nuevoTrabajador.fecha_ingreso || null,
+                  activo: true
+                })
+                if (error) { alert('Error: ' + error.message) }
+                else {
+                  setMsg('✓ Trabajador dado de alta')
+                  setNuevoTrabajador({num_empleado:'',nombre:'',puesto:'',obra_id:'',forma_pago:'TRANSFERENCIA',sueldo_semanal:'',tiene_bono:true,fecha_ingreso:''})
+                  const { data } = await supabase.from('trabajadores').select('*, obra:obras(nombre)').eq('activo', true).order('num_empleado')
+                  setTodosTrabajadores(data || [])
+                  setTimeout(()=>setMsg(''),3000)
+                }
+                setGuardandoTrab(false)
+              }}
+              className="px-6 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium">
+              {guardandoTrab ? 'Guardando...' : '✓ Dar de alta'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* TAB: PRÉSTAMOS */}
       {tab === 'prestamos' && (
         <div>
@@ -1619,10 +1590,6 @@ export default function SuperView({ perfil }) {
             setVacacionesData(data || [])
           }}
         />
-      )}
-
-      {tab === 'estado-vacaciones' && (
-        <EstadoVacaciones supabase={supabase} semanaActual={semanaActual} />
       )}
 
       {/* TAB: OBRAS INACTIVAS */}
