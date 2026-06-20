@@ -1174,6 +1174,7 @@ export default function SuperView({ perfil }) {
                     <th style={{textAlign:'left',padding:'8px 10px',color:'#9ca3af',fontWeight:500}}>Obra</th>
                     <th style={{textAlign:'left',padding:'8px 10px',color:'#9ca3af',fontWeight:500}}>Pago</th>
                     <th style={{textAlign:'right',padding:'8px 10px',color:'#7c3aed',fontWeight:500}}>Sueldo</th>
+                    <th style={{textAlign:'center',padding:'8px 10px',color:'#16a34a',fontWeight:500}}>Bono $</th>
                     <th style={{textAlign:'center',padding:'8px 10px',color:'#9ca3af',fontWeight:500}}>Acción</th>
                   </tr>
                 </thead>
@@ -1192,6 +1193,9 @@ export default function SuperView({ perfil }) {
                       </td>
                       <td style={{padding:'7px 10px',color:'#6b7280',fontSize:'11px'}}>{t.forma_pago}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',fontWeight:600,color:'#7c3aed'}}>${t.sueldo_semanal?.toLocaleString('es-MX')}</td>
+                      <td style={{padding:'7px 10px',textAlign:'center'}}>
+                        {t.tiene_bono && (t.monto_bono||0) > 0 ? <span style={{color:'#16a34a',fontSize:'12px',fontWeight:600}}>${(t.monto_bono||0).toLocaleString('es-MX')}</span> : <span style={{color:'#d1d5db'}}>—</span>}
+                      </td>
                       <td style={{padding:'7px 10px',textAlign:'center'}}>
                         <button onClick={async () => {
                           if (!confirm(`¿Dar de baja a ${t.nombre}?`)) return
