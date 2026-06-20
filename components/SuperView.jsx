@@ -778,6 +778,33 @@ export default function SuperView({ perfil }) {
     cargarTodo()
   }
 
+  async function eliminarSemana() {
+    if (!confirm(`¿Eliminar la semana ${semanaActual.semana_num} (${semanaActual.fecha_inicio} al ${semanaActual.fecha_fin})? Esto borrará la semana y toda su información.`)) return
+
+    // Borrar en cascada: asistencias → nominas_obra → incidencias → semana
+    const { data: noms } = await supabase
+      .from('nominas_obra')
+      .select('id')
+      .eq('semana_id', semanaActual.id)
+
+    for (const n of (noms || [])) {
+      await supabase.from('asistencias').delete().eq('nomina_obra_id', n.id)
+    }
+    await supabase.from('nominas_obra').delete().eq('semana_id', semanaActual.id)
+    await supabase.from('incidencias').delete().eq('semana_id', semanaActual.id)
+    await supabase.from('semanas').delete().eq('id', semanaActual.id)
+
+    // Ir a la semana más reciente
+    const { data: restantes } = await supabase
+      .from('semanas')
+      .select('*')
+      .order('fecha_inicio', { ascending: false })
+    setSemanas(restantes || [])
+    setSemanaActual(restantes?.[0] || null)
+    setMsg('✓ Semana eliminada')
+    setTimeout(() => setMsg(''), 3000)
+  }
+
   async function exportarExcel() {
     const { data: todasNominas } = await supabase.from('nominas_obra')
       .select('*, obra:obras(nombre)').eq('semana_id', semanaActual.id)
@@ -843,6 +870,9 @@ export default function SuperView({ perfil }) {
           {msg && <span className="text-green-600 text-sm">{msg}</span>}
           <button onClick={exportarExcel} className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700">📊 Excel</button>
           {semanaActual?.estado==='abierta' && <button onClick={cerrarSemana} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50">Cerrar semana</button>}
+          {nominas.length === 0 && semanaActual && (
+            <button onClick={eliminarSemana} className="px-3 py-1.5 text-xs border border-red-200 text-red-500 rounded-lg hover:bg-red-50">🗑 Eliminar semana</button>
+          )}
           <button onClick={() => setShowNuevaSemana(true)} className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700">+ Nueva semana</button>
         </div>
       </div>
