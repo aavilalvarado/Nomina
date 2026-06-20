@@ -100,31 +100,15 @@ export default function ResidenteView({ perfil }) {
       })
     }
     const LISTA_SILVANA = [
-      'MUÑIZ RIOS JUAN CARLOS',
-      'BENITEZ CARRILLO BUENA VENTURA',
-      'RAMIREZ CALDERON RAUL',
-      'LOPEZ PEREZ HUMBERTO',
-      'GRANADOS MARIN LUIS ENRIQUE',
-      'LOEZA CABRERA EMANUEL OSIEL',
-      'DIAZ GARCIA JOEL ESAU',
-      'VICARIO MANRIQUEZ JUAN MANUEL',
-      'HERNANDEZ CRUZ MIGUEL ANGEL',
-      'NAJERA RAMIREZ ARTURO',
-      'SANDOVAL DIAZ LUIS ARMANDO',
-      'JAVALERA MEDINA ADAN FERNANDO',
-      'CABRERA BECERRA GONZALO',
-      'FARRERA ALVARADO LUIS ENRIQUE',
-      'MEDINA VALENCIA JOSE LUIS',
-      'GUERRERO ORTEGA SANTOS',
-      'HERRERA HERNANDEZ MAURICIO MAGDALENO',
-      'DIAZ GARCIA JOSUE JACOB',
-      'VELAZQUEZ JAVALERA JUAN ANTONIO',
-      'LEMUS GARCIA ANASTACIO',
-      'RAMIREZ FLORES LEONEL',
-      'RAMIREZ MARTINEZ ALAN DANIEL',
-      'MENDOZA ALFONSO CARLOS ENRIQUE',
-      'ESPINOZA CASILLAS JONATHAN VALENTIN',
-      'LOPEZ CASTILLO CARLOS MAURICIO',
+      'MUÑIZ RIOS JUAN CARLOS','BENITEZ CARRILLO BUENA VENTURA','RAMIREZ CALDERON RAUL',
+      'LOPEZ PEREZ HUMBERTO','GRANADOS MARIN LUIS ENRIQUE','LOEZA CABRERA EMANUEL OSIEL',
+      'DIAZ GARCIA JOEL ESAU','VICARIO MANRIQUEZ JUAN MANUEL','HERNANDEZ CRUZ MIGUEL ANGEL',
+      'NAJERA RAMIREZ ARTURO','SANDOVAL DIAZ LUIS ARMANDO','JAVALERA MEDINA ADAN FERNANDO',
+      'CABRERA BECERRA GONZALO','FARRERA ALVARADO LUIS ENRIQUE','MEDINA VALENCIA JOSE LUIS',
+      'GUERRERO ORTEGA SANTOS','HERRERA HERNANDEZ MAURICIO MAGDALENO','DIAZ GARCIA JOSUE JACOB',
+      'VELAZQUEZ JAVALERA JUAN ANTONIO','LEMUS GARCIA ANASTACIO','RAMIREZ FLORES LEONEL',
+      'RAMIREZ MARTINEZ ALAN DANIEL','MENDOZA ALFONSO CARLOS ENRIQUE',
+      'ESPINOZA CASILLAS JONATHAN VALENTIN','LOPEZ CASTILLO CARLOS MAURICIO',
     ]
     const silvanaId = obras.find(o => o.nombre === 'SILVANA')?.id
 
@@ -135,8 +119,6 @@ export default function ResidenteView({ perfil }) {
         horas_extra: 0, prestamos: 0
       }
       if (!obraSelecInit[t.id]) {
-        // Precargar SILVANA si el trabajador está en la lista de prenómina
-        // Solo si ya no tiene obra guardada en BD (no sobreescribe semanas previas)
         const nombreNorm = t.nombre.trim().toUpperCase().replace(/\s+/g, ' ')
         const enSilvana = silvanaId && LISTA_SILVANA.some(n => {
           const a = nombreNorm.replace(/\s+/g, ' ')
@@ -475,27 +457,47 @@ export default function ResidenteView({ perfil }) {
                         </div>
                       )}
                     </td>
-                    {DIAS.map(d => (
-                      <td key={d} style={{padding:'4px 2px', textAlign:'center'}}>
-                        <select
-                          value={d === 'sabado' ? (parseFloat(a[d]) === 0 ? 0 : 0.5) : (a[d] ?? 1.1)}
-                          onChange={e => updateAsistencia(t.id, d, parseFloat(e.target.value))}
-                          disabled={bloqueado || sinObra || (esIncidencia && fechaIncidencia && fechasSemana[d] && fechasSemana[d] >= fechaIncidencia)}
-                          style={{fontSize:'11px', border:'1px solid', borderColor: parseFloat(a[d])===0 ? '#fca5a5' : '#e5e7eb', borderRadius:'4px', padding:'2px 1px', width:'46px', textAlign:'center', background: (esIncidencia && fechaIncidencia && fechasSemana[d] && fechasSemana[d] >= fechaIncidencia) ? '#f3f4f6' : parseFloat(a[d])===0 ? '#fef2f2' : sinObra ? '#f9fafb' : 'white', color: (esIncidencia && fechaIncidencia && fechasSemana[d] && fechasSemana[d] >= fechaIncidencia) ? '#9ca3af' : parseFloat(a[d])===0 ? '#ef4444' : sinObra ? '#d1d5db' : '#374151'}}>
-                          {d === 'sabado' ? (
-                            <>
-                              <option value={0.5}>✓</option>
-                              <option value={0}>✗</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value={1.1}>✓</option>
-                              <option value={0}>✗</option>
-                            </>
-                          )}
-                        </select>
-                      </td>
-                    ))}
+                    {DIAS.map(d => {
+                      const maxVal = d === 'sabado' ? 0.5 : 1.1
+                      const rawVal = a[d] ?? (d === 'sabado' ? 0.5 : 1.1)
+                      const val = parseFloat(rawVal)
+                      const bloqIncidencia = esIncidencia && fechaIncidencia && fechasSemana[d] && fechasSemana[d] >= fechaIncidencia
+                      const disabled = bloqueado || sinObra || bloqIncidencia
+                      // Color semáforo: rojo=0, amarillo=parcial, verde=completo
+                      const esCero = val === 0
+                      const esParcial = val > 0 && val < maxVal
+                      const borderColor = bloqIncidencia ? '#e5e7eb' : esCero ? '#fca5a5' : esParcial ? '#fcd34d' : '#86efac'
+                      const bgColor = bloqIncidencia ? '#f3f4f6' : sinObra ? '#f9fafb' : esCero ? '#fef2f2' : esParcial ? '#fffbeb' : 'white'
+                      const textColor = bloqIncidencia ? '#9ca3af' : sinObra ? '#d1d5db' : esCero ? '#ef4444' : esParcial ? '#b45309' : '#374151'
+                      return (
+                        <td key={d} style={{padding:'4px 2px', textAlign:'center'}}>
+                          <input
+                            type="number"
+                            min={0}
+                            max={maxVal}
+                            step={0.1}
+                            value={val}
+                            onChange={e => {
+                              let v = parseFloat(e.target.value)
+                              if (isNaN(v)) v = 0
+                              if (v > maxVal) v = maxVal
+                              if (v < 0) v = 0
+                              // Redondear a 1 decimal
+                              v = Math.round(v * 10) / 10
+                              updateAsistencia(t.id, d, v)
+                            }}
+                            disabled={disabled}
+                            style={{
+                              width:'46px', fontSize:'11px', fontWeight: esParcial ? 600 : 400,
+                              border:`1px solid ${borderColor}`, borderRadius:'4px',
+                              padding:'2px 4px', textAlign:'center',
+                              background: bgColor, color: textColor,
+                              outline:'none'
+                            }}
+                          />
+                        </td>
+                      )
+                    })}
                     <td style={{padding:'4px 6px', textAlign:'center', fontWeight:600, color: sinObra ? '#d1d5db' : tieneFalta ? '#ef4444' : '#374151'}}>
                       {esVacaciones ? <span style={{fontSize:'10px',color:'#0369a1',background:'#e0f2fe',padding:'1px 6px',borderRadius:'10px'}}>Vac</span> : esBaja ? <span style={{fontSize:'10px',color:'#dc2626',background:'#fee2e2',padding:'1px 6px',borderRadius:'10px'}}>Baja</span> : sinObra ? '—' : dias % 1 === 0 ? dias : dias.toFixed(1)}
                     </td>
