@@ -111,6 +111,14 @@ export default function ResidenteView({ perfil }) {
       'RAMIREZ MARTINEZ ALAN DANIEL','MENDOZA ALFONSO CARLOS ENRIQUE',
       'ESPINOZA CASILLAS JONATHAN VALENTIN','LOPEZ CASTILLO CARLOS MAURICIO',
     ]
+    const LISTA_PRACTICANTES = [
+      'GONZALEZ FLORES JESUS EMILIANO',
+      'ESTRADA CHAVEZ EMILIANO',
+      'LOPEZ ROBLES OMAR ALBERTO',
+      'PERCIVAL SALAZAR KARINA ISABEL',
+    ]
+    const oficinaId = obras.find(o => o.nombre === 'OFICINA')?.id
+
     const LISTA_TOWN_HOUSES = [
       'BAUTISTA MARTINEZ DANIEL',
       'MARIÑO ROCHA OSCAR JERONIMO',
@@ -141,6 +149,8 @@ export default function ResidenteView({ perfil }) {
           obraSelecInit[t.id] = silvanaId
         } else if (townHousesId && matchNombre(t.nombre, LISTA_TOWN_HOUSES)) {
           obraSelecInit[t.id] = townHousesId
+        } else if (oficinaId && matchNombre(t.nombre, LISTA_PRACTICANTES)) {
+          obraSelecInit[t.id] = oficinaId
         } else {
           obraSelecInit[t.id] = ''
         }
