@@ -628,7 +628,7 @@ export default function SuperView({ perfil }) {
     const init = {}
     trabajadoresOficina.forEach(t => {
       init[t.id] = map[t.id] || {
-        viernes:1.1, sabado:0.5, domingo:0, lunes:1.1, martes:1.1, miercoles:1.1, jueves:1.1,
+        viernes:1.2, sabado:0, domingo:0, lunes:1.2, martes:1.2, miercoles:1.2, jueves:1.2,
         horas_extra:0, prestamos:0
       }
     })
@@ -657,7 +657,7 @@ export default function SuperView({ perfil }) {
     setGuardandoOficina(true)
     const rows = (trabajadoresOficina || []).filter(t => t && t.nombre).map(t => {
       const a = asistOficina[t.id] || {}
-      const dias = DIAS.reduce((s,d) => s + (parseFloat(a[d])===1.1?1:parseFloat(a[d])||0), 0)
+      const dias = DIAS.reduce((s,d) => s + (parseFloat(a[d])===1.2?1.2:parseFloat(a[d])||0), 0)
       return {
         nomina_obra_id: nominaOficina.id, trabajador_id: t.id,
         viernes: parseFloat(a.viernes)||0, sabado: parseFloat(a.sabado)||0,
@@ -1015,7 +1015,7 @@ export default function SuperView({ perfil }) {
               <tbody>
                 {(trabajadoresOficina || []).filter(t => t && t.nombre && t.id).map(t => {
                   const a = asistOficina[t.id] || {}
-                  const dias = DIAS.reduce((s,d) => s + (parseFloat(a[d])===1.1?1:parseFloat(a[d])||0), 0)
+                  const dias = DIAS.reduce((s,d) => s + (parseFloat(a[d])===1.2?1.2:parseFloat(a[d])||0), 0)
                   return (
                     <tr key={t.id} style={{borderBottom:'1px solid #f9fafb'}}>
                       <td style={{padding:'6px 8px',color:'#9ca3af'}}>{(t.num_empleado == null ? 'NA' : (t.num_empleado == null ? 'NA' : String(t.num_empleado).padStart(4,'0')))}</td>
@@ -1032,7 +1032,7 @@ export default function SuperView({ perfil }) {
                       </td>
                       <td style={{padding:'6px 8px',color:'#6b7280',fontSize:'11px'}}>{t.puesto}</td>
                       {DIAS.map(d => {
-                        const maxVal = d === 'sabado' ? 0.5 : 1.1
+                        const maxVal = d === 'sabado' ? 0 : 1.2
                         const val = parseFloat(a[d] ?? maxVal)
                         const claveP = `${t.id}_${d}`
                         const enParcial = !!modoParcialOficina[claveP]
@@ -1041,6 +1041,12 @@ export default function SuperView({ perfil }) {
                         const borderColor = esCero ? '#fca5a5' : esParcial ? '#fcd34d' : '#86efac'
                         const bgColor = esCero ? '#fef2f2' : esParcial ? '#fffbeb' : 'white'
                         const textColor = esCero ? '#ef4444' : esParcial ? '#b45309' : '#374151'
+                        // Sábado bloqueado para oficina
+                        if (d === 'sabado') return (
+                          <td key={d} style={{padding:'4px 2px',textAlign:'center'}}>
+                            <div style={{width:'46px',fontSize:'11px',color:'#d1d5db',background:'#f9fafb',border:'1px solid #f3f4f6',borderRadius:'4px',padding:'2px 4px',textAlign:'center',margin:'0 auto'}}>—</div>
+                          </td>
+                        )
                         return (
                           <td key={d} style={{padding:'4px 2px',textAlign:'center'}}>
                             {enParcial ? (
