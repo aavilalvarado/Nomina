@@ -111,7 +111,24 @@ export default function ResidenteView({ perfil }) {
       'RAMIREZ MARTINEZ ALAN DANIEL','MENDOZA ALFONSO CARLOS ENRIQUE',
       'ESPINOZA CASILLAS JONATHAN VALENTIN','LOPEZ CASTILLO CARLOS MAURICIO',
     ]
+    const LISTA_TOWN_HOUSES = [
+      'BAUTISTA MARTINEZ DANIEL',
+      'MARIÑO ROCHA OSCAR JERONIMO',
+      'GALLARDO VARGAS WILEVALDO ANGEL',
+      'CRUZ HILARIO JOSE ALBERTO',
+      'ROSALES HERNANDEZ ANGEL DANIEL',
+      'REYES ABAD DANIEL',
+    ]
     const silvanaId = obras.find(o => o.nombre === 'SILVANA')?.id
+    const townHousesId = obras.find(o => o.nombre === 'TOWN HOUSES')?.id
+
+    const matchNombre = (nombre, lista) => {
+      const n = nombre.trim().toUpperCase().replace(/\s+/g, ' ')
+      return lista.some(ref => {
+        const r = ref.replace(/\s+/g, ' ')
+        return n === r || n.startsWith(r) || r.startsWith(n)
+      })
+    }
 
     ;(trab || []).forEach(t => {
       if (!asistInit[t.id]) asistInit[t.id] = {
@@ -120,13 +137,13 @@ export default function ResidenteView({ perfil }) {
         horas_extra: 0, prestamos: 0
       }
       if (!obraSelecInit[t.id]) {
-        const nombreNorm = t.nombre.trim().toUpperCase().replace(/\s+/g, ' ')
-        const enSilvana = silvanaId && LISTA_SILVANA.some(n => {
-          const a = nombreNorm.replace(/\s+/g, ' ')
-          const b = n.replace(/\s+/g, ' ')
-          return a === b || a.startsWith(b) || b.startsWith(a)
-        })
-        obraSelecInit[t.id] = enSilvana ? silvanaId : ''
+        if (silvanaId && matchNombre(t.nombre, LISTA_SILVANA)) {
+          obraSelecInit[t.id] = silvanaId
+        } else if (townHousesId && matchNombre(t.nombre, LISTA_TOWN_HOUSES)) {
+          obraSelecInit[t.id] = townHousesId
+        } else {
+          obraSelecInit[t.id] = ''
+        }
       }
     })
     setAsistencias(asistInit)
@@ -467,21 +484,15 @@ export default function ResidenteView({ perfil }) {
                       const enParcial = !!modoParcial[claveP]
                       const esCero = val === 0
                       const esParcial = val > 0 && val < maxVal
-
-                      // Color borde según estado
                       const borderColor = bloqIncidencia ? '#e5e7eb' : esCero ? '#fca5a5' : esParcial ? '#fcd34d' : '#86efac'
                       const bgSelect = bloqIncidencia ? '#f3f4f6' : sinObra ? '#f9fafb' : esCero ? '#fef2f2' : esParcial ? '#fffbeb' : 'white'
                       const textSelect = bloqIncidencia ? '#9ca3af' : sinObra ? '#d1d5db' : esCero ? '#ef4444' : esParcial ? '#b45309' : '#374151'
-
                       return (
                         <td key={d} style={{padding:'4px 2px', textAlign:'center'}}>
                           {enParcial ? (
-                            // Modo input libre: teclear horas parciales
                             <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'2px'}}>
                               <input
-                                type="number"
-                                min={0} max={maxVal} step={0.1}
-                                autoFocus
+                                type="number" min={0} max={maxVal} step={0.1} autoFocus
                                 value={val}
                                 onChange={e => {
                                   let v = parseFloat(e.target.value)
@@ -490,12 +501,7 @@ export default function ResidenteView({ perfil }) {
                                   updateAsistencia(t.id, d, v)
                                 }}
                                 disabled={disabledCell}
-                                style={{
-                                  width:'42px', fontSize:'11px', fontWeight:600,
-                                  border:`1px solid ${borderColor}`, borderRadius:'4px',
-                                  padding:'2px 3px', textAlign:'center',
-                                  background: bgSelect, color: textSelect, outline:'none'
-                                }}
+                                style={{width:'42px', fontSize:'11px', fontWeight:600, border:`1px solid ${borderColor}`, borderRadius:'4px', padding:'2px 3px', textAlign:'center', background: bgSelect, color: textSelect, outline:'none'}}
                               />
                               <button
                                 onClick={() => setModoParcial(prev => { const n={...prev}; delete n[claveP]; return n })}
@@ -504,13 +510,11 @@ export default function ResidenteView({ perfil }) {
                               </button>
                             </div>
                           ) : (
-                            // Modo select: ✓ / ✗ / ✎ parcial
                             <select
                               value={esParcial ? 'PARCIAL' : val}
                               onChange={e => {
                                 const v = e.target.value
                                 if (v === 'PARCIAL') {
-                                  // Activar modo input, poner valor intermedio como punto de partida
                                   updateAsistencia(t.id, d, d === 'sabado' ? 0.3 : 0.5)
                                   setModoParcial(prev => ({ ...prev, [claveP]: true }))
                                 } else {
@@ -518,11 +522,7 @@ export default function ResidenteView({ perfil }) {
                                 }
                               }}
                               disabled={disabledCell}
-                              style={{
-                                fontSize:'11px', border:`1px solid ${borderColor}`,
-                                borderRadius:'4px', padding:'2px 1px', width:'46px',
-                                textAlign:'center', background: bgSelect, color: textSelect
-                              }}>
+                              style={{fontSize:'11px', border:`1px solid ${borderColor}`, borderRadius:'4px', padding:'2px 1px', width:'46px', textAlign:'center', background: bgSelect, color: textSelect}}>
                               <option value={maxVal}>✓</option>
                               <option value={0}>✗</option>
                               <option value="PARCIAL">{esParcial ? `${val}` : '✎'}</option>
