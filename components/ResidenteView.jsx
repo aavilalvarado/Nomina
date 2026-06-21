@@ -100,13 +100,34 @@ export default function ResidenteView({ perfil }) {
         asistInit[a.trabajador_id] = a
       })
     }
+    const LISTA_SILVANA = [
+      'MUÑIZ RIOS JUAN CARLOS','BENITEZ CARRILLO BUENA VENTURA','RAMIREZ CALDERON RAUL',
+      'LOPEZ PEREZ HUMBERTO','GRANADOS MARIN LUIS ENRIQUE','LOEZA CABRERA EMANUEL OSIEL',
+      'DIAZ GARCIA JOEL ESAU','VICARIO MANRIQUEZ JUAN MANUEL','HERNANDEZ CRUZ MIGUEL ANGEL',
+      'NAJERA RAMIREZ ARTURO','SANDOVAL DIAZ LUIS ARMANDO','JAVALERA MEDINA ADAN FERNANDO',
+      'CABRERA BECERRA GONZALO','FARRERA ALVARADO LUIS ENRIQUE','MEDINA VALENCIA JOSE LUIS',
+      'GUERRERO ORTEGA SANTOS','HERRERA HERNANDEZ MAURICIO MAGDALENO','DIAZ GARCIA JOSUE JACOB',
+      'VELAZQUEZ JAVALERA JUAN ANTONIO','LEMUS GARCIA ANASTACIO','RAMIREZ FLORES LEONEL',
+      'RAMIREZ MARTINEZ ALAN DANIEL','MENDOZA ALFONSO CARLOS ENRIQUE',
+      'ESPINOZA CASILLAS JONATHAN VALENTIN','LOPEZ CASTILLO CARLOS MAURICIO',
+    ]
+    const silvanaId = obras.find(o => o.nombre === 'SILVANA')?.id
+
     ;(trab || []).forEach(t => {
       if (!asistInit[t.id]) asistInit[t.id] = {
         viernes: 1.1, sabado: 0.5, domingo: 0,
         lunes: 1.1, martes: 1.1, miercoles: 1.1, jueves: 1.1,
         horas_extra: 0, prestamos: 0
       }
-      if (!obraSelecInit[t.id]) obraSelecInit[t.id] = ''
+      if (!obraSelecInit[t.id]) {
+        const nombreNorm = t.nombre.trim().toUpperCase().replace(/\s+/g, ' ')
+        const enSilvana = silvanaId && LISTA_SILVANA.some(n => {
+          const a = nombreNorm.replace(/\s+/g, ' ')
+          const b = n.replace(/\s+/g, ' ')
+          return a === b || a.startsWith(b) || b.startsWith(a)
+        })
+        obraSelecInit[t.id] = enSilvana ? silvanaId : ''
+      }
     })
     setAsistencias(asistInit)
     setObraSeleccionada(obraSelecInit)
