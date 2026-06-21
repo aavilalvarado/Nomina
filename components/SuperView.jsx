@@ -497,8 +497,6 @@ export default function SuperView({ perfil }) {
   const [showNuevaSemana, setShowNuevaSemana] = useState(false)
   const [msg, setMsg] = useState('')
   const [tab, setTab] = useState('nominas') // nominas | oficina | sin-obra | vacaciones | obras-inactivas
-  const [modoParcialOficina, setModoParcialOficina] = useState({}) // { 'trabId_dia': true }
-  const [alertasFaltasOficina, setAlertasFaltasOficina] = useState({}) // { trabId: totalFaltas }
   // Datos adicionales
   const [trabajadoresSinObra, setTrabajadoresSinObra] = useState([])
   const [trabajadoresOficina, setTrabajadoresOficina] = useState([])
@@ -628,28 +626,11 @@ export default function SuperView({ perfil }) {
     const init = {}
     trabajadoresOficina.forEach(t => {
       init[t.id] = map[t.id] || {
-        viernes:1.2, sabado:0, domingo:0, lunes:1.2, martes:1.2, miercoles:1.2, jueves:1.2,
+        viernes:1.1, sabado:1.1, domingo:0, lunes:1.1, martes:1.1, miercoles:1.1, jueves:1.1,
         horas_extra:0, prestamos:0
       }
     })
     setAsistOficina(init)
-
-    // Cargar conteo de faltas en últimos 30 días
-    const trabIds = trabajadoresOficina.map(t => t.id)
-    if (trabIds.length > 0) {
-      const hace30 = new Date()
-      hace30.setDate(hace30.getDate() - 30)
-      const limite = hace30.toISOString().split('T')[0]
-      const { data: faltas } = await supabase
-        .from('asistencia_diaria')
-        .select('trabajador_id')
-        .in('trabajador_id', trabIds)
-        .eq('valor', 0)
-        .gte('fecha', limite)
-      const conteo = {}
-      ;(faltas || []).forEach(f => { conteo[f.trabajador_id] = (conteo[f.trabajador_id] || 0) + 1 })
-      setAlertasFaltasOficina(conteo)
-    }
   }
 
   async function guardarOficina() {
@@ -657,12 +638,11 @@ export default function SuperView({ perfil }) {
     setGuardandoOficina(true)
     const rows = (trabajadoresOficina || []).filter(t => t && t.nombre).map(t => {
       const a = asistOficina[t.id] || {}
-      const DIAS_OF = ['viernes','lunes','martes','miercoles','jueves']
-      const dias = Math.round(DIAS_OF.reduce((s,d) => s + (parseFloat(a[d]) || 0), 0) * 10) / 10
+      const dias = DIAS.reduce((s,d) => s + (parseFloat(a[d])===1.1?1:parseFloat(a[d])||0), 0)
       return {
         nomina_obra_id: nominaOficina.id, trabajador_id: t.id,
-        viernes: parseFloat(a.viernes)||0, sabado: 0,
-        domingo: 0, lunes: parseFloat(a.lunes)||0,
+        viernes: parseFloat(a.viernes)||0, sabado: parseFloat(a.sabado)||0,
+        domingo: parseFloat(a.domingo)||0, lunes: parseFloat(a.lunes)||0,
         martes: parseFloat(a.martes)||0, miercoles: parseFloat(a.miercoles)||0,
         jueves: parseFloat(a.jueves)||0, dias_total: dias,
         horas_extra: parseFloat(a.horas_extra)||0,
@@ -838,6 +818,40 @@ export default function SuperView({ perfil }) {
     setTimeout(() => setMsg(''), 3000)
   }
 
+  async function reiniciarSemana() {
+    if (!semanaActual) return
+    if (!confirm(`¿Reiniciar la semana ${semanaActual.semana_num}? Esto borrará TODA la asistencia capturada (asistencias, asistencia diaria e incidencias) y regresará todas las nóminas a borrador. Los trabajadores no se eliminan.`)) return
+
+    // 1. Obtener todas las nominas_obra de esta semana
+    const { data: noms } = await supabase
+      .from('nominas_obra').select('id').eq('semana_id', semanaActual.id)
+
+    // 2. Borrar asistencias de cada nómina
+    for (const n of (noms || [])) {
+      await supabase.from('asistencias').delete().eq('nomina_obra_id', n.id)
+    }
+
+    // 3. Regresar todas las nominas_obra a borrador
+    await supabase.from('nominas_obra')
+      .update({ estado: 'borrador', enviada_at: null })
+      .eq('semana_id', semanaActual.id)
+
+    // 4. Borrar asistencia_diaria de esta semana
+    await supabase.from('asistencia_diaria')
+      .delete()
+      .gte('fecha', semanaActual.fecha_inicio)
+      .lte('fecha', semanaActual.fecha_fin)
+
+    // 5. Borrar incidencias de esta semana
+    await supabase.from('incidencias').delete().eq('semana_id', semanaActual.id)
+
+    setMsg('✓ Semana reiniciada — toda la asistencia fue borrada')
+    setTimeout(() => setMsg(''), 4000)
+    cargarNominas()
+    cargarIncidencias()
+    cargarOficina()
+  }
+
   async function exportarExcel() {
     const { data: todasNominas } = await supabase.from('nominas_obra')
       .select('*, obra:obras(nombre)').eq('semana_id', semanaActual.id)
@@ -903,6 +917,9 @@ export default function SuperView({ perfil }) {
           {msg && <span className="text-green-600 text-sm">{msg}</span>}
           <button onClick={exportarExcel} className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700">📊 Excel</button>
           {semanaActual?.estado==='abierta' && <button onClick={cerrarSemana} className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50">Cerrar semana</button>}
+          {semanaActual && (
+            <button onClick={reiniciarSemana} className="px-3 py-1.5 text-xs border border-orange-200 text-orange-600 rounded-lg hover:bg-orange-50">🔄 Reiniciar semana</button>
+          )}
           {nominas.length === 0 && semanaActual && (
             <button onClick={eliminarSemana} className="px-3 py-1.5 text-xs border border-red-200 text-red-500 rounded-lg hover:bg-red-50">🗑 Eliminar semana</button>
           )}
@@ -1016,82 +1033,23 @@ export default function SuperView({ perfil }) {
               <tbody>
                 {(trabajadoresOficina || []).filter(t => t && t.nombre && t.id).map(t => {
                   const a = asistOficina[t.id] || {}
-                  const DIAS_OFICINA = ['viernes','lunes','martes','miercoles','jueves']
-                  const dias = Math.round(DIAS_OFICINA.reduce((s,d) => s + (parseFloat(a[d]) || 0), 0) * 10) / 10
+                  const dias = DIAS.reduce((s,d) => s + (parseFloat(a[d])===1.1?1:parseFloat(a[d])||0), 0)
                   return (
                     <tr key={t.id} style={{borderBottom:'1px solid #f9fafb'}}>
                       <td style={{padding:'6px 8px',color:'#9ca3af'}}>{(t.num_empleado == null ? 'NA' : (t.num_empleado == null ? 'NA' : String(t.num_empleado).padStart(4,'0')))}</td>
-                      <td style={{padding:'6px 8px',fontWeight:500}}>
-                        <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
-                          {t.nombre}
-                          {(alertasFaltasOficina[t.id] || 0) >= 3 && (
-                            <span title={`${alertasFaltasOficina[t.id]} faltas en los últimos 30 días`}
-                              style={{fontSize:'10px',background:'#fed7aa',color:'#c2410c',borderRadius:'10px',padding:'1px 6px',fontWeight:600}}>
-                              ⚠️ {alertasFaltasOficina[t.id]} faltas
-                            </span>
-                          )}
-                        </div>
-                      </td>
+                      <td style={{padding:'6px 8px',fontWeight:500}}>{t.nombre}</td>
                       <td style={{padding:'6px 8px',color:'#6b7280',fontSize:'11px'}}>{t.puesto}</td>
-                      {DIAS.map(d => {
-                        const maxVal = d === 'sabado' ? 0 : 1.2
-                        const val = parseFloat(a[d] ?? maxVal)
-                        const claveP = `${t.id}_${d}`
-                        const enParcial = !!modoParcialOficina[claveP]
-                        const esCero = val === 0
-                        const esParcial = val > 0 && val < maxVal
-                        const borderColor = esCero ? '#fca5a5' : esParcial ? '#fcd34d' : '#86efac'
-                        const bgColor = esCero ? '#fef2f2' : esParcial ? '#fffbeb' : 'white'
-                        const textColor = esCero ? '#ef4444' : esParcial ? '#b45309' : '#374151'
-                        // Sábado bloqueado para oficina
-                        if (d === 'sabado' || d === 'domingo') return (
-                          <td key={d} style={{padding:'4px 2px',textAlign:'center'}}>
-                            <div style={{width:'46px',fontSize:'11px',color:'#d1d5db',background:'#f9fafb',border:'1px solid #f3f4f6',borderRadius:'4px',padding:'2px 4px',textAlign:'center',margin:'0 auto'}}>—</div>
-                          </td>
-                        )
-                        return (
-                          <td key={d} style={{padding:'4px 2px',textAlign:'center'}}>
-                            {enParcial ? (
-                              <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px'}}>
-                                <input
-                                  type="number" min={0} max={maxVal} step={0.1} autoFocus
-                                  value={val}
-                                  onChange={e => {
-                                    let v = parseFloat(e.target.value)
-                                    if (isNaN(v)) v = 0
-                                    v = Math.min(Math.max(Math.round(v * 10) / 10, 0), maxVal)
-                                    setAsistOficina(prev => ({...prev,[t.id]:{...prev[t.id],[d]:v}}))
-                                  }}
-                                  style={{width:'42px',fontSize:'11px',fontWeight:600,border:`1px solid ${borderColor}`,borderRadius:'4px',padding:'2px 3px',textAlign:'center',background:bgColor,color:textColor,outline:'none'}}
-                                />
-                                <button
-                                  onClick={() => setModoParcialOficina(prev => { const n={...prev}; delete n[claveP]; return n })}
-                                  style={{fontSize:'9px',color:'#6b7280',background:'none',border:'none',cursor:'pointer',padding:0,lineHeight:1}}>
-                                  ✕ cerrar
-                                </button>
-                              </div>
-                            ) : (
-                              <select
-                                value={esParcial ? 'PARCIAL' : val}
-                                onChange={e => {
-                                  const v = e.target.value
-                                  if (v === 'PARCIAL') {
-                                    setAsistOficina(prev => ({...prev,[t.id]:{...prev[t.id],[d]: d === 'sabado' ? 0.3 : 0.5}}))
-                                    setModoParcialOficina(prev => ({...prev,[claveP]:true}))
-                                  } else {
-                                    setAsistOficina(prev => ({...prev,[t.id]:{...prev[t.id],[d]:parseFloat(v)}}))
-                                  }
-                                }}
-                                style={{fontSize:'11px',border:`1px solid ${borderColor}`,borderRadius:'4px',padding:'2px 1px',width:'46px',textAlign:'center',background:bgColor,color:textColor}}>
-                                <option value={maxVal}>✓</option>
-                                <option value={0}>✗</option>
-                                <option value="PARCIAL">{esParcial ? `${val}` : '✎'}</option>
-                              </select>
-                            )}
-                          </td>
-                        )
-                      })}
-                      <td style={{padding:'6px 8px',textAlign:'center',fontWeight:600,color:dias<6.0?'#ef4444':'#374151'}}>{dias % 1 === 0 ? dias : dias.toFixed(1)}</td>
+                      {DIAS.map(d => (
+                        <td key={d} style={{padding:'4px 2px',textAlign:'center'}}>
+                          <select value={a[d]??1.1} onChange={e => setAsistOficina(prev => ({...prev,[t.id]:{...prev[t.id],[d]:parseFloat(e.target.value)}}))}
+                            style={{fontSize:'11px',border:'1px solid',borderColor:parseFloat(a[d])===0?'#fca5a5':'#e5e7eb',borderRadius:'4px',padding:'2px',width:'44px',background:parseFloat(a[d])===0?'#fef2f2':'white',color:parseFloat(a[d])===0?'#ef4444':'#374151'}}>
+                            <option value={1.1}>✓</option>
+                            <option value={0.5}>½</option>
+                            <option value={0}>✗</option>
+                          </select>
+                        </td>
+                      ))}
+                      <td style={{padding:'6px 8px',textAlign:'center',fontWeight:600,color:dias<6?'#ef4444':'#374151'}}>{dias}</td>
                       <td style={{padding:'4px 6px',textAlign:'center'}}>
                         <input type="number" min="0" step="0.5" value={a.horas_extra||0}
                           onChange={e => setAsistOficina(prev => ({...prev,[t.id]:{...prev[t.id],horas_extra:e.target.value}}))}
