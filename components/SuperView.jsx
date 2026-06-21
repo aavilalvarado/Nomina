@@ -497,6 +497,8 @@ export default function SuperView({ perfil }) {
   const [showNuevaSemana, setShowNuevaSemana] = useState(false)
   const [msg, setMsg] = useState('')
   const [tab, setTab] = useState('nominas') // nominas | oficina | sin-obra | vacaciones | obras-inactivas
+  const [modoParcialOficina, setModoParcialOficina] = useState({}) // { 'trabId_dia': true }
+  const [alertasFaltasOficina, setAlertasFaltasOficina] = useState({}) // { trabId: totalFaltas }
   // Datos adicionales
   const [trabajadoresSinObra, setTrabajadoresSinObra] = useState([])
   const [trabajadoresOficina, setTrabajadoresOficina] = useState([])
@@ -626,11 +628,28 @@ export default function SuperView({ perfil }) {
     const init = {}
     trabajadoresOficina.forEach(t => {
       init[t.id] = map[t.id] || {
-        viernes:1.1, sabado:1.1, domingo:0, lunes:1.1, martes:1.1, miercoles:1.1, jueves:1.1,
+        viernes:1.1, sabado:0.5, domingo:0, lunes:1.1, martes:1.1, miercoles:1.1, jueves:1.1,
         horas_extra:0, prestamos:0
       }
     })
     setAsistOficina(init)
+
+    // Cargar conteo de faltas en últimos 30 días
+    const trabIds = trabajadoresOficina.map(t => t.id)
+    if (trabIds.length > 0) {
+      const hace30 = new Date()
+      hace30.setDate(hace30.getDate() - 30)
+      const limite = hace30.toISOString().split('T')[0]
+      const { data: faltas } = await supabase
+        .from('asistencia_diaria')
+        .select('trabajador_id')
+        .in('trabajador_id', trabIds)
+        .eq('valor', 0)
+        .gte('fecha', limite)
+      const conteo = {}
+      ;(faltas || []).forEach(f => { conteo[f.trabajador_id] = (conteo[f.trabajador_id] || 0) + 1 })
+      setAlertasFaltasOficina(conteo)
+    }
   }
 
   async function guardarOficina() {
@@ -1000,18 +1019,70 @@ export default function SuperView({ perfil }) {
                   return (
                     <tr key={t.id} style={{borderBottom:'1px solid #f9fafb'}}>
                       <td style={{padding:'6px 8px',color:'#9ca3af'}}>{(t.num_empleado == null ? 'NA' : (t.num_empleado == null ? 'NA' : String(t.num_empleado).padStart(4,'0')))}</td>
-                      <td style={{padding:'6px 8px',fontWeight:500}}>{t.nombre}</td>
+                      <td style={{padding:'6px 8px',fontWeight:500}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                          {t.nombre}
+                          {(alertasFaltasOficina[t.id] || 0) >= 3 && (
+                            <span title={`${alertasFaltasOficina[t.id]} faltas en los últimos 30 días`}
+                              style={{fontSize:'10px',background:'#fed7aa',color:'#c2410c',borderRadius:'10px',padding:'1px 6px',fontWeight:600}}>
+                              ⚠️ {alertasFaltasOficina[t.id]} faltas
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td style={{padding:'6px 8px',color:'#6b7280',fontSize:'11px'}}>{t.puesto}</td>
-                      {DIAS.map(d => (
-                        <td key={d} style={{padding:'4px 2px',textAlign:'center'}}>
-                          <select value={a[d]??1.1} onChange={e => setAsistOficina(prev => ({...prev,[t.id]:{...prev[t.id],[d]:parseFloat(e.target.value)}}))}
-                            style={{fontSize:'11px',border:'1px solid',borderColor:parseFloat(a[d])===0?'#fca5a5':'#e5e7eb',borderRadius:'4px',padding:'2px',width:'44px',background:parseFloat(a[d])===0?'#fef2f2':'white',color:parseFloat(a[d])===0?'#ef4444':'#374151'}}>
-                            <option value={1.1}>✓</option>
-                            <option value={0.5}>½</option>
-                            <option value={0}>✗</option>
-                          </select>
-                        </td>
-                      ))}
+                      {DIAS.map(d => {
+                        const maxVal = d === 'sabado' ? 0.5 : 1.1
+                        const val = parseFloat(a[d] ?? maxVal)
+                        const claveP = `${t.id}_${d}`
+                        const enParcial = !!modoParcialOficina[claveP]
+                        const esCero = val === 0
+                        const esParcial = val > 0 && val < maxVal
+                        const borderColor = esCero ? '#fca5a5' : esParcial ? '#fcd34d' : '#86efac'
+                        const bgColor = esCero ? '#fef2f2' : esParcial ? '#fffbeb' : 'white'
+                        const textColor = esCero ? '#ef4444' : esParcial ? '#b45309' : '#374151'
+                        return (
+                          <td key={d} style={{padding:'4px 2px',textAlign:'center'}}>
+                            {enParcial ? (
+                              <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px'}}>
+                                <input
+                                  type="number" min={0} max={maxVal} step={0.1} autoFocus
+                                  value={val}
+                                  onChange={e => {
+                                    let v = parseFloat(e.target.value)
+                                    if (isNaN(v)) v = 0
+                                    v = Math.min(Math.max(Math.round(v * 10) / 10, 0), maxVal)
+                                    setAsistOficina(prev => ({...prev,[t.id]:{...prev[t.id],[d]:v}}))
+                                  }}
+                                  style={{width:'42px',fontSize:'11px',fontWeight:600,border:`1px solid ${borderColor}`,borderRadius:'4px',padding:'2px 3px',textAlign:'center',background:bgColor,color:textColor,outline:'none'}}
+                                />
+                                <button
+                                  onClick={() => setModoParcialOficina(prev => { const n={...prev}; delete n[claveP]; return n })}
+                                  style={{fontSize:'9px',color:'#6b7280',background:'none',border:'none',cursor:'pointer',padding:0,lineHeight:1}}>
+                                  ✕ cerrar
+                                </button>
+                              </div>
+                            ) : (
+                              <select
+                                value={esParcial ? 'PARCIAL' : val}
+                                onChange={e => {
+                                  const v = e.target.value
+                                  if (v === 'PARCIAL') {
+                                    setAsistOficina(prev => ({...prev,[t.id]:{...prev[t.id],[d]: d === 'sabado' ? 0.3 : 0.5}}))
+                                    setModoParcialOficina(prev => ({...prev,[claveP]:true}))
+                                  } else {
+                                    setAsistOficina(prev => ({...prev,[t.id]:{...prev[t.id],[d]:parseFloat(v)}}))
+                                  }
+                                }}
+                                style={{fontSize:'11px',border:`1px solid ${borderColor}`,borderRadius:'4px',padding:'2px 1px',width:'46px',textAlign:'center',background:bgColor,color:textColor}}>
+                                <option value={maxVal}>✓</option>
+                                <option value={0}>✗</option>
+                                <option value="PARCIAL">{esParcial ? `${val}` : '✎'}</option>
+                              </select>
+                            )}
+                          </td>
+                        )
+                      })}
                       <td style={{padding:'6px 8px',textAlign:'center',fontWeight:600,color:dias<6?'#ef4444':'#374151'}}>{dias}</td>
                       <td style={{padding:'4px 6px',textAlign:'center'}}>
                         <input type="number" min="0" step="0.5" value={a.horas_extra||0}
