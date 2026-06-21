@@ -117,7 +117,8 @@ export default function ResidenteView({ perfil }) {
       'LOPEZ ROBLES OMAR ALBERTO',
       'PERCIVAL SALAZAR KARINA ISABEL',
     ]
-    const oficinaId = obras.find(o => o.nombre === 'OFICINA')?.id
+    // oficinaId ya está declarado arriba desde todasObras (línea ~51)
+    // No redeclarar aquí — usar el mismo para el match de practicantes
 
     const LISTA_TOWN_HOUSES = [
       'BAUTISTA MARTINEZ DANIEL',
