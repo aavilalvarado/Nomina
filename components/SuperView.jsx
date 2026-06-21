@@ -520,10 +520,17 @@ export default function SuperView({ perfil }) {
   const [asistOficina, setAsistOficina] = useState({})
   const [nominaOficina, setNominaOficina] = useState(null)
   const [guardandoOficina, setGuardandoOficina] = useState(false)
+  const [modoParcialOficina, setModoParcialOficina] = useState({})
+  const [alertasFaltasOficina, setAlertasFaltasOficina] = useState({})
+  const [trabajadoresTH, setTrabajadoresTH] = useState([])
+  const [asistTH, setAsistTH] = useState({})
+  const [nominaTH, setNominaTH] = useState(null)
+  const [guardandoTH, setGuardandoTH] = useState(false)
+  const [modoParcialTH, setModoParcialTH] = useState({})
 
 
   useEffect(() => { cargarTodo() }, [])
-  useEffect(() => { if (semanaActual) { cargarNominas(); cargarIncidencias(); cargarOficina() } }, [semanaActual])
+  useEffect(() => { if (semanaActual) { cargarNominas(); cargarIncidencias(); cargarOficina(); cargarTownHouses() } }, [semanaActual])
 
   async function cargarTodo() {
     const { data } = await supabase.from('semanas').select('*').order('fecha_inicio', { ascending: false })
@@ -631,6 +638,61 @@ export default function SuperView({ perfil }) {
       }
     })
     setAsistOficina(init)
+  }
+
+  async function cargarTownHouses() {
+    const { data: thObra } = await supabase.from('obras').select('id').eq('nombre', 'TOWN HOUSES').single()
+    if (!thObra) return
+
+    let { data: nom } = await supabase.from('nominas_obra').select('*')
+      .eq('semana_id', semanaActual.id).eq('obra_id', thObra.id).single()
+    if (!nom) {
+      const { data: nueva } = await supabase.from('nominas_obra')
+        .insert({ semana_id: semanaActual.id, obra_id: thObra.id, residente_id: perfil.id })
+        .select().single()
+      nom = nueva
+    }
+    setNominaTH(nom)
+
+    const { data: trabTH } = await supabase.from('trabajadores')
+      .select('*').eq('obra_id', thObra.id).eq('activo', true).order('num_empleado')
+    setTrabajadoresTH(trabTH || [])
+
+    const { data: asist } = await supabase.from('asistencias').select('*').eq('nomina_obra_id', nom.id)
+    const map = {}
+    ;(asist || []).forEach(a => { map[a.trabajador_id] = a })
+
+    const init = {}
+    ;(trabTH || []).forEach(t => {
+      init[t.id] = map[t.id] || {
+        viernes:1.1, sabado:0.5, domingo:0, lunes:1.1, martes:1.1, miercoles:1.1, jueves:1.1,
+        horas_extra:0, prestamos:0
+      }
+    })
+    setAsistTH(init)
+  }
+
+  async function guardarTH() {
+    if (!nominaTH) return
+    setGuardandoTH(true)
+    const rows = (trabajadoresTH || []).filter(t => t && t.nombre).map(t => {
+      const a = asistTH[t.id] || {}
+      const dias = Math.round(DIAS.reduce((s,d) => s + (parseFloat(a[d]) || 0), 0) * 10) / 10
+      return {
+        nomina_obra_id: nominaTH.id, trabajador_id: t.id,
+        viernes: parseFloat(a.viernes)||0, sabado: parseFloat(a.sabado)||0,
+        domingo: parseFloat(a.domingo)||0, lunes: parseFloat(a.lunes)||0,
+        martes: parseFloat(a.martes)||0, miercoles: parseFloat(a.miercoles)||0,
+        jueves: parseFloat(a.jueves)||0, dias_total: dias,
+        horas_extra: parseFloat(a.horas_extra)||0,
+        prestamos: parseFloat(a.prestamos)||0,
+        bono_aplicado: (t.tiene_bono && dias >= 6) ? 1 : 0, total_pagar: 0
+      }
+    })
+    await supabase.from('asistencias').upsert(rows, { onConflict: 'nomina_obra_id,trabajador_id' })
+    setGuardandoTH(false)
+    setMsg('✓ Town Houses guardada')
+    setTimeout(() => setMsg(''), 2000)
   }
 
   async function guardarOficina() {
@@ -831,10 +893,9 @@ export default function SuperView({ perfil }) {
       await supabase.from('asistencias').delete().eq('nomina_obra_id', n.id)
     }
 
-    // 3. Regresar todas las nominas_obra a borrador
-    await supabase.from('nominas_obra')
-      .update({ estado: 'borrador', enviada_at: null })
-      .eq('semana_id', semanaActual.id)
+    // 3. Borrar nominas_obra para que el residente las recree limpias al entrar
+    // (si las dejamos en borrador el residente ve pantalla bloqueada hasta recargar)
+    await supabase.from('nominas_obra').delete().eq('semana_id', semanaActual.id)
 
     // 4. Borrar asistencia_diaria de esta semana
     await supabase.from('asistencia_diaria')
@@ -850,6 +911,7 @@ export default function SuperView({ perfil }) {
     cargarNominas()
     cargarIncidencias()
     cargarOficina()
+    cargarTownHouses()
   }
 
   async function exportarExcel() {
@@ -887,6 +949,7 @@ export default function SuperView({ perfil }) {
   const TABS = [
     { id:'nominas', label:'📋 Nóminas', badge: nominas.length },
     { id:'oficina', label:'🏢 Oficina', badge: null },
+    { id:'town-houses', label:'🏘 Town Houses', badge: null },
     { id:'vacaciones', label:'🏖 Vacaciones', badge: vacaciones.length || null },
     { id:'bajas', label:'🚫 Bajas', badge: bajas.length || null },
     { id:'sin-obra', label:'👷 Sin obra', badge: trabajadoresSinObra.length || null },
@@ -1058,6 +1121,123 @@ export default function SuperView({ perfil }) {
                       <td style={{padding:'4px 6px',textAlign:'center'}}>
                         <input type="number" min="0" step="100" value={a.prestamos||0}
                           onChange={e => setAsistOficina(prev => ({...prev,[t.id]:{...prev[t.id],prestamos:e.target.value}}))}
+                          style={{width:'60px',fontSize:'11px',border:'1px solid #e5e7eb',borderRadius:'4px',padding:'2px 4px',textAlign:'center'}} />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: TOWN HOUSES */}
+      {tab === 'town-houses' && (
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+            <span className="font-medium text-sm text-gray-900">Asistencia — TOWN HOUSES</span>
+            <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+              {nominaTH?.estado === 'aprobada' && <span style={{fontSize:'12px',background:'#dcfce7',color:'#16a34a',padding:'3px 10px',borderRadius:'20px',fontWeight:500}}>✓ Aprobada</span>}
+              {nominaTH?.estado !== 'aprobada' && (
+                <>
+                  <button onClick={guardarTH} disabled={guardandoTH}
+                    className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    {guardandoTH ? 'Guardando...' : '💾 Guardar'}
+                  </button>
+                  <button onClick={async () => {
+                    await guardarTH()
+                    await supabase.from('nominas_obra').update({estado:'aprobada', aprobada_at: new Date().toISOString()}).eq('id', nominaTH.id)
+                    setNominaTH(prev => ({...prev, estado:'aprobada'}))
+                    setMsg('✓ Town Houses aprobada')
+                    setTimeout(()=>setMsg(''),3000)
+                  }} className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    ✓ Aprobar
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
+              <thead>
+                <tr style={{background:'#f9fafb',borderBottom:'1px solid #f3f4f6'}}>
+                  <th style={{textAlign:'left',padding:'8px',color:'#9ca3af',fontWeight:500}}>#</th>
+                  <th style={{textAlign:'left',padding:'8px',color:'#9ca3af',fontWeight:500,minWidth:'200px'}}>Trabajador</th>
+                  <th style={{textAlign:'left',padding:'8px',color:'#9ca3af',fontWeight:500}}>Puesto</th>
+                  {DIAS_LABEL.map(d => <th key={d} style={{textAlign:'center',padding:'8px 4px',color:'#9ca3af',fontWeight:500,width:'48px'}}>{d}</th>)}
+                  <th style={{textAlign:'center',padding:'8px',color:'#9ca3af',fontWeight:500}}>Días</th>
+                  <th style={{textAlign:'center',padding:'8px',color:'#9ca3af',fontWeight:500}}>H.Extra</th>
+                  <th style={{textAlign:'center',padding:'8px',color:'#9ca3af',fontWeight:500}}>Préstamos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(trabajadoresTH || []).filter(t => t && t.nombre && t.id).map(t => {
+                  const a = asistTH[t.id] || {}
+                  const dias = Math.round(DIAS.reduce((s,d) => s + (parseFloat(a[d])||0), 0) * 10) / 10
+                  const tieneFalta = dias < 6.0
+                  return (
+                    <tr key={t.id} style={{borderBottom:'1px solid #f9fafb', background: tieneFalta ? '#fff5f5' : 'white'}}>
+                      <td style={{padding:'6px 8px',color:'#9ca3af'}}>{t.num_empleado == null ? 'NA' : String(t.num_empleado).padStart(4,'0')}</td>
+                      <td style={{padding:'6px 8px',fontWeight:500}}>{t.nombre}</td>
+                      <td style={{padding:'6px 8px',color:'#6b7280',fontSize:'11px'}}>{t.puesto}</td>
+                      {DIAS.map(d => {
+                        const maxVal = d === 'sabado' ? 0.5 : 1.1
+                        const val = parseFloat(a[d] ?? maxVal)
+                        const claveP = `${t.id}_${d}`
+                        const enParcial = !!modoParcialTH[claveP]
+                        const esCero = val === 0
+                        const esParcial = val > 0 && val < maxVal
+                        const borderColor = esCero ? '#fca5a5' : esParcial ? '#fcd34d' : '#86efac'
+                        const bgColor = esCero ? '#fef2f2' : esParcial ? '#fffbeb' : 'white'
+                        const textColor = esCero ? '#ef4444' : esParcial ? '#b45309' : '#374151'
+                        return (
+                          <td key={d} style={{padding:'4px 2px',textAlign:'center'}}>
+                            {enParcial ? (
+                              <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px'}}>
+                                <input type="number" min={0} max={maxVal} step={0.1} autoFocus value={val}
+                                  onChange={e => {
+                                    let v = parseFloat(e.target.value)
+                                    if (isNaN(v)) v = 0
+                                    v = Math.min(Math.max(Math.round(v*10)/10, 0), maxVal)
+                                    setAsistTH(prev => ({...prev,[t.id]:{...prev[t.id],[d]:v}}))
+                                  }}
+                                  style={{width:'42px',fontSize:'11px',fontWeight:600,border:`1px solid ${borderColor}`,borderRadius:'4px',padding:'2px 3px',textAlign:'center',background:bgColor,color:textColor,outline:'none'}}
+                                />
+                                <button onClick={() => setModoParcialTH(prev => { const n={...prev}; delete n[claveP]; return n })}
+                                  style={{fontSize:'9px',color:'#6b7280',background:'none',border:'none',cursor:'pointer',padding:0,lineHeight:1}}>
+                                  ✕ cerrar
+                                </button>
+                              </div>
+                            ) : (
+                              <select value={esParcial ? 'PARCIAL' : val}
+                                onChange={e => {
+                                  const v = e.target.value
+                                  if (v === 'PARCIAL') {
+                                    setAsistTH(prev => ({...prev,[t.id]:{...prev[t.id],[d]: d==='sabado'?0.3:0.5}}))
+                                    setModoParcialTH(prev => ({...prev,[claveP]:true}))
+                                  } else {
+                                    setAsistTH(prev => ({...prev,[t.id]:{...prev[t.id],[d]:parseFloat(v)}}))
+                                  }
+                                }}
+                                style={{fontSize:'11px',border:`1px solid ${borderColor}`,borderRadius:'4px',padding:'2px 1px',width:'46px',textAlign:'center',background:bgColor,color:textColor}}>
+                                <option value={maxVal}>✓</option>
+                                <option value={0}>✗</option>
+                                <option value="PARCIAL">{esParcial ? `${val}` : '✎'}</option>
+                              </select>
+                            )}
+                          </td>
+                        )
+                      })}
+                      <td style={{padding:'6px 8px',textAlign:'center',fontWeight:600,color:tieneFalta?'#ef4444':'#374151'}}>{dias % 1 === 0 ? dias : dias.toFixed(1)}</td>
+                      <td style={{padding:'4px 6px',textAlign:'center'}}>
+                        <input type="number" min="0" step="0.5" value={a.horas_extra||0}
+                          onChange={e => setAsistTH(prev => ({...prev,[t.id]:{...prev[t.id],horas_extra:e.target.value}}))}
+                          style={{width:'48px',fontSize:'11px',border:'1px solid #e5e7eb',borderRadius:'4px',padding:'2px 4px',textAlign:'center'}} />
+                      </td>
+                      <td style={{padding:'4px 6px',textAlign:'center'}}>
+                        <input type="number" min="0" step="100" value={a.prestamos||0}
+                          onChange={e => setAsistTH(prev => ({...prev,[t.id]:{...prev[t.id],prestamos:e.target.value}}))}
                           style={{width:'60px',fontSize:'11px',border:'1px solid #e5e7eb',borderRadius:'4px',padding:'2px 4px',textAlign:'center'}} />
                       </td>
                     </tr>
